@@ -1,7 +1,5 @@
 # ArduiBeeScale - Arduino Beehive Scale System with WiFi + Local MQTT
 
-![BeezScale](img/Sketch_Steckplatine.png "BeezScale Circuit")
-
 **ArduiBeeScale** is a professional-grade, open-source Arduino beehive monitoring system with **local WiFi + MQTT** architecture. Automatically measures weight, temperature, and humidity with real-time private data storage on your own Raspberry Pi.
 
 > **Project Name**: ArduiBeeScale (Arduino + Beehive + Scale)
