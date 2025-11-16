@@ -1,0 +1,507 @@
+# Home Assistant Automations for ArduiBeeScale
+#
+# Copy this to /config/automations.yaml in Home Assistant
+# OR
+# Create individual automation files in /config/automations/
+# Then reference them in configuration.yaml with:
+#   automation: !include_dir_list automations/
+#
+# Date: 2025-11-16
+
+# ==============================================================================
+# ALERT 1: HIGH TEMPERATURE
+# ==============================================================================
+# Description: Alert when temperature exceeds 35°C for more than 5 minutes
+# Why: Indicates potential stress for bees or ventilation issue
+
+- id: "alert_high_temperature_ruche_001"
+  alias: "Alerte Température Élevée Ruche 001"
+  description: "Notification when temperature exceeds 35°C"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.temperature_ruche_001
+      above: 35
+      for:
+        minutes: 5
+
+  condition:
+    - condition: state
+      entity_id: sensor.temperature_ruche_001
+      state: "!=unavailable"
+
+  action:
+    # Persistent notification in HA
+    - service: persistent_notification.create
+      data:
+        notification_id: "temp_high_alert_001"
+        title: "⚠️ Température Élevée Ruche 001"
+        message: >-
+          Température actuelle: {{ states('sensor.temperature_ruche_001') }}°C
+          (Seuil alerte: 35°C)
+          Durée: > 5 minutes
+
+    # Email notification (if configured)
+    - service: notify.email
+      data:
+        title: "🌡️ Alerte Température Ruche 001"
+        message: >-
+          La température de la ruche 001 dépasse 35°C!
+
+          Température actuelle: {{ states('sensor.temperature_ruche_001') }}°C
+          Humidité: {{ states('sensor.humidity_ruche_001') }}%
+          Heure de l'alerte: {{ now().strftime('%H:%M:%S') }}
+
+          Recommandations:
+          - Vérifier la ventilation
+          - Assurer un accès à l'eau
+          - Surveiller le comportement des abeilles
+
+    # Log to file
+    - service: logbook.log
+      data:
+        name: "Alerte Température"
+        message: "Température ruche 001: {{ states('sensor.temperature_ruche_001') }}°C"
+        entity_id: sensor.temperature_ruche_001
+
+  trigger_variables:
+    temp: "{{ states('sensor.temperature_ruche_001') | float(0) }}"
+
+---
+
+# ==============================================================================
+# ALERT 2: LOW TEMPERATURE
+# ==============================================================================
+# Description: Alert when temperature drops below 10°C
+# Why: Indicates cold stress or heater malfunction
+
+- id: "alert_low_temperature_ruche_001"
+  alias: "Alerte Température Basse Ruche 001"
+  description: "Alert when temperature is too low"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.temperature_ruche_001
+      below: 10
+      for:
+        hours: 2
+
+  action:
+    - service: persistent_notification.create
+      data:
+        notification_id: "temp_low_alert_001"
+        title: "❄️ Température Basse Ruche 001"
+        message: >-
+          Température actuelle: {{ states('sensor.temperature_ruche_001') }}°C
+          (Alerte < 10°C)
+
+    - service: notify.email
+      data:
+        title: "❄️ Alerte Température Basse"
+        message: >-
+          Température anormalement basse détectée!
+          Température: {{ states('sensor.temperature_ruche_001') }}°C
+
+---
+
+# ==============================================================================
+# ALERT 3: LOW BATTERY
+# ==============================================================================
+# Description: Alert when battery level drops below 20%
+# Why: Indicates need for battery replacement
+
+- id: "alert_low_battery_ruche_001"
+  alias: "Alerte Batterie Faible Ruche 001"
+  description: "Notification when battery is low (<20%)"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.batterie_ruche_001
+      below: 20
+
+  action:
+    - service: persistent_notification.create
+      data:
+        notification_id: "battery_low_alert_001"
+        title: "🔋 Batterie Faible Ruche 001"
+        message: >-
+          Batterie: {{ states('sensor.batterie_ruche_001') }}%
+          Tension: {{ states('sensor.tension_batterie_ruche_001') }}V
+
+          Action: Remplacer les piles dès que possible
+
+    - service: notify.email
+      data:
+        title: "🔋 Batterie Faible - Action Requise"
+        message: >-
+          La batterie de la ruche 001 est faible:
+          {{ states('sensor.batterie_ruche_001') }}%
+          Tension: {{ states('sensor.tension_batterie_ruche_001') }}V
+
+          Veuillez remplacer les piles (4x AA) dès que possible.
+
+---
+
+# ==============================================================================
+# ALERT 4: CRITICAL BATTERY
+# ==============================================================================
+# Description: Alert when battery drops below 5%
+# Why: System will stop working very soon
+
+- id: "alert_critical_battery_ruche_001"
+  alias: "Alerte Batterie Critique Ruche 001"
+  description: "Alert when battery is critical (<5%)"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.batterie_ruche_001
+      below: 5
+
+  action:
+    - service: persistent_notification.create
+      data:
+        notification_id: "battery_critical_alert_001"
+        title: "🚨 BATTERIE CRITIQUE Ruche 001"
+        message: >-
+          BATTERIE CRITIQUE: {{ states('sensor.batterie_ruche_001') }}%
+
+          ⚠️ DANGER: Le système arrêtera bientôt de fonctionner!
+          Remplacez immédiatement les piles!
+
+    - service: notify.email
+      data:
+        title: "🚨 BATTERIE CRITIQUE - REMPLACER IMMÉDIATEMENT"
+        message: >-
+          ALERTE URGENTE!
+
+          La batterie de la ruche 001 est CRITIQUE:
+          {{ states('sensor.batterie_ruche_001') }}%
+          Tension: {{ states('sensor.tension_batterie_ruche_001') }}V
+
+          ⚠️ Le système s'arrêtera très bientôt!
+
+          ACTION IMMÉDIATE REQUISE:
+          1. Vous rendre à la ruche
+          2. Remplacer les 4 piles AA
+          3. Redémarrer le système
+
+---
+
+# ==============================================================================
+# ALERT 5: NO DATA RECEIVED
+# ==============================================================================
+# Description: Alert when no data received for 4 hours
+# Why: Indicates WiFi, MQTT, or sensor failure
+
+- id: "alert_no_data_ruche_001"
+  alias: "Alerte Pas de Données Ruche 001"
+  description: "Alert when no data received for 4 hours"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: sensor.temperature_ruche_001
+      to: "unavailable"
+      for:
+        hours: 4
+
+  action:
+    - service: persistent_notification.create
+      data:
+        notification_id: "no_data_alert_001"
+        title: "❌ Pas de Données Ruche 001"
+        message: >-
+          Aucune données reçues depuis 4 heures!
+
+          Causes possibles:
+          - Perte de connexion WiFi
+          - Batterie épuisée
+          - Défaillance du capteur
+          - Problème MQTT
+
+          Actions à tenter:
+          1. Vérifier la connexion WiFi
+          2. Vérifier la batterie
+          3. Redémarrer le système Arduino
+
+    - service: notify.email
+      data:
+        title: "❌ Perte de Connexion Ruche 001"
+        message: >-
+          La ruche 001 ne transmet plus de données depuis 4 heures!
+
+          Dernière données: {{ as_timestamp(state_attr('sensor.temperature_ruche_001', 'last_updated')) | timestamp_custom('%Y-%m-%d %H:%M:%S') }}
+
+          Diagnostique suggéré:
+          - WiFi déconnecté?
+          - Batterie épuisée?
+          - Capteur en panne?
+
+---
+
+# ==============================================================================
+# ALERT 6: ABNORMAL WEIGHT LOSS
+# ==============================================================================
+# Description: Alert if weight loss > 5kg in 24 hours (harvest or queen death)
+# Why: Could indicate significant event in hive
+
+- id: "alert_abnormal_weight_loss_ruche_001"
+  alias: "Alerte Perte Poids Anormale Ruche 001"
+  description: "Alert if weight loss exceeds normal range"
+  mode: single
+
+  trigger:
+    - platform: template
+      value_template: >
+        {% set current = states('sensor.poids_ruche_001') | float(0) %}
+        {% set previous = states('sensor.poids_ruche_001', rounded_seconds=86400) | float(0) %}
+        {{ (previous - current) > 5 and current > 0 }}
+
+  action:
+    - service: persistent_notification.create
+      data:
+        notification_id: "weight_loss_alert_001"
+        title: "📉 Perte de Poids Anormale Ruche 001"
+        message: >-
+          Perte de poids importante détectée!
+
+          Poids actuel: {{ states('sensor.poids_ruche_001') }}kg
+          Perte estimée: > 5kg en 24h
+
+          Causes possibles:
+          - Récolte de miel?
+          - Essaimage?
+          - Problème grave dans la ruche
+
+          Recommandation: Inspection manuelle requise
+
+    - service: notify.email
+      data:
+        title: "📉 Perte de Poids Importante - Inspection Recommandée"
+        message: >-
+          Perte de poids anormale détectée à la ruche 001:
+          > 5kg en 24 heures
+
+          Poids actuel: {{ states('sensor.poids_ruche_001') }}kg
+
+          Causes possibles:
+          - Récolte de miel
+          - Essaimage ou désertion
+          - Problème sanitaire
+
+          Une inspection manuelle est recommandée.
+
+---
+
+# ==============================================================================
+# ALERT 7: HUMIDITY OUT OF RANGE
+# ==============================================================================
+# Description: Alert if humidity outside 30-80% range
+# Why: Indicates ventilation or condensation problems
+
+- id: "alert_humidity_high_ruche_001"
+  alias: "Alerte Humidité Élevée Ruche 001"
+  description: "Alert when humidity > 80%"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.humidity_ruche_001
+      above: 80
+      for:
+        hours: 2
+
+  action:
+    - service: persistent_notification.create
+      data:
+        notification_id: "humidity_high_alert_001"
+        title: "💧 Humidité Élevée Ruche 001"
+        message: >-
+          Humidité: {{ states('sensor.humidity_ruche_001') }}%
+          (Alerte: > 80%)
+
+          Recommandations:
+          - Améliorer la ventilation
+          - Ajouter des trous d'aération
+          - Vérifier les fuites d'eau
+
+    - service: notify.email
+      data:
+        title: "💧 Humidité Élevée - Ventilation à Améliorer"
+        message: >-
+          L'humidité de la ruche 001 est trop élevée:
+          {{ states('sensor.humidity_ruche_001') }}%
+
+          Cela peut causer des problèmes de moisissure et de maladies.
+
+---
+
+# ==============================================================================
+# DAILY SUMMARY REPORT
+# ==============================================================================
+# Description: Send daily summary at 20:00
+# Why: Provides overview of hive conditions
+
+- id: "daily_summary_ruche_001"
+  alias: "Rapport Quotidien Ruche 001"
+  description: "Send daily summary report at 20:00"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: "20:00:00"
+
+  action:
+    - service: notify.email
+      data:
+        title: "📋 Rapport Quotidien Ruche 001"
+        message: >
+          **Rapport Quotidien - {{ now().strftime('%d %B %Y') }}**
+
+          **Température:**
+          - Actuelle: {{ states('sensor.temperature_ruche_001') }}°C
+          - Min: {{ state_attr('sensor.temperature_ruche_001', 'min_value') | default('N/A') }}°C
+          - Max: {{ state_attr('sensor.temperature_ruche_001', 'max_value') | default('N/A') }}°C
+
+          **Humidité:**
+          - Actuelle: {{ states('sensor.humidity_ruche_001') }}%
+
+          **Poids:**
+          - Actuel: {{ states('sensor.poids_ruche_001') }}kg
+          - Net: {{ states('sensor.poids_net_ruche_001') | default('N/A') }}kg
+
+          **Batterie:**
+          - {{ states('sensor.batterie_ruche_001') }}% ({{ states('sensor.tension_batterie_ruche_001') }}V)
+
+          **Statuts:**
+          - Température: {{ states('sensor.etat_temperature_ruche_001') }}
+          - Batterie: {{ states('sensor.etat_batterie_ruche_001') }}
+
+          ✅ Tous les systèmes fonctionnent correctement.
+
+    - service: logbook.log
+      data:
+        name: "Rapport Quotidien"
+        message: "Rapport quotidien envoyé pour ruche 001"
+
+---
+
+# ==============================================================================
+# WEEKLY SUMMARY REPORT
+# ==============================================================================
+# Description: Send weekly summary every Sunday at 19:00
+
+- id: "weekly_summary_ruche_001"
+  alias: "Rapport Hebdomadaire Ruche 001"
+  description: "Send weekly summary report"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: "19:00:00"
+    - platform: time_pattern
+      weekday: "sun"
+
+  action:
+    - service: notify.email
+      data:
+        title: "📊 Rapport Hebdomadaire Ruche 001"
+        message: >
+          **Rapport Hebdomadaire**
+
+          **Semaine du {{ (now() - timedelta(days=7)).strftime('%d %B') }}
+          au {{ now().strftime('%d %B %Y') }}**
+
+          **Statistiques Température:**
+          - Moyenne: {{ state_attr('sensor.temperature_ruche_001', 'mean') | default('N/A') }}°C
+          - Min: {{ state_attr('sensor.temperature_ruche_001', 'min_value') | default('N/A') }}°C
+          - Max: {{ state_attr('sensor.temperature_ruche_001', 'max_value') | default('N/A') }}°C
+
+          **Bilan Poids:**
+          - Poids actuel: {{ states('sensor.poids_ruche_001') }}kg
+          - Changement semaine: {{ state_attr('sensor.poids_ruche_001', 'change_week') | default('N/A') }}kg
+
+          **Alertes cette semaine:**
+          - Aucune alerte majeure ✅
+
+          **Recommandations:**
+          - Continuer à surveiller
+          - Vérifier batterie mensuellement
+          - Inspecter manuellement avant récolte
+
+---
+
+# ==============================================================================
+# TEST AUTOMATION (For verification)
+# ==============================================================================
+# Description: Test automation that sends message when triggered manually
+
+- id: "test_automation_ruche_001"
+  alias: "Test - Alerte Test Ruche 001"
+  description: "Test automation for debugging (comment out after testing)"
+  mode: single
+
+  trigger:
+    # Manual trigger: Home Assistant → Developer Tools → Automation → Select this automation → Test
+    platform: event
+    event_type: "automation_test"
+    event_data:
+      automation_id: "test_automation_ruche_001"
+
+  action:
+    - service: persistent_notification.create
+      data:
+        notification_id: "test_alert_001"
+        title: "✅ Test Automatisation Réussi"
+        message: >
+          Cette automatisation fonctionne correctement!
+
+          Données actuelles:
+          - Température: {{ states('sensor.temperature_ruche_001') }}°C
+          - Humidité: {{ states('sensor.humidity_ruche_001') }}%
+          - Poids: {{ states('sensor.poids_ruche_001') }}kg
+          - Batterie: {{ states('sensor.batterie_ruche_001') }}%
+
+    - service: notify.email
+      data:
+        title: "✅ Test Notification Email"
+        message: "Si vous recevez cet email, les notifications fonctionnent!"
+
+---
+
+# ==============================================================================
+# NOTES FOR CUSTOMIZATION
+# ==============================================================================
+#
+# To add these automations to Home Assistant:
+#
+# 1. Copy the entire content of this file
+# 2. In Home Assistant, go to Settings → Automations & Scenes
+# 3. Click "Create Automation"
+# 4. Click three dots → Edit in YAML
+# 5. Paste each automation block (between the "---" lines)
+#
+# OR
+#
+# 1. Save this file as /config/automations/arduibeescale_001.yaml
+# 2. In configuration.yaml, add:
+#    automation: !include_dir_list automations/
+# 3. Restart Home Assistant
+#
+# CUSTOMIZATION HINTS:
+# - Change entity IDs (sensor.temperature_ruche_001) to match your setup
+# - Adjust thresholds (35°C, 20%, etc.) to your preferences
+# - Modify email recipients and messages
+# - Add additional conditions (e.g., only alert during certain hours)
+# - Add multiple hives by duplicating and changing IDs
+#
+# TESTING:
+# - Settings → Automations & Scenes → Automation
+# - Click "Test automation" button next to automation name
+# - Check Services and Logs for debugging
+#
+# ==============================================================================

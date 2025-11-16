@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeezScale - Real-time Beehive Monitor</title>
+
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+    <!-- Socket.io for real-time updates -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2ecc71;
+            --secondary-color: #3498db;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --text-color: #34495e;
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .header-subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #e74c3c;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background-color: #2ecc71;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Control panel */
+        .control-panel {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        select, input {
+            padding: 0.6rem 1rem;
+            border: 2px solid var(--light-color);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+        }
+
+        /* Stats cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--primary-color);
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-card.temperature {
+            border-left-color: #e74c3c;
+        }
+
+        .stat-card.humidity {
+            border-left-color: #3498db;
+        }
+
+        .stat-card.weight {
+            border-left-color: #f39c12;
+        }
+
+        .stat-card.battery {
+            border-left-color: #2ecc71;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-unit {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        .stat-info {
+            font-size: 0.85rem;
+            color: #95a5a6;
+            margin-top: 0.5rem;
+        }
+
+        .stat-value.loading {
+            color: #bdc3c7;
+        }
+
+        /* Charts section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark-color);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--light-color);
+        }
+
+        .chart-canvas {
+            max-height: 400px;
+            position: relative;
+        }
+
+        /* Alert messages */
+        .alert {
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        .alert.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .alert.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .alert.danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .header h1 {
+                font-size: 1.4rem;
+            }
+
+            .control-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .control-group {
+                flex-direction: column;
+            }
+
+            select, input {
+                width: 100%;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-top: 3rem;
+            border-top: 1px solid var(--light-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #7f8c8d;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>🐝 BeezScale Dashboard</h1>
+            <p class="header-subtitle">Real-time Beehive Monitoring System</p>
+        </div>
+        <div class="connection-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Connecting...</span>
+        </div>
+    </div>
+
+    <!-- Main container -->
+    <div class="container">
+        <!-- Control panel -->
+        <div class="control-panel">
+            <div class="control-group">
+                <label for="hiveSelect">Select Hive:</label>
+                <select id="hiveSelect">
+                    <option value="">-- Select a hive --</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="timeRangeSelect">Time Range:</label>
+                <select id="timeRangeSelect">
+                    <option value="24">Last 24 Hours</option>
+                    <option value="72">Last 3 Days</option>
+                    <option value="168">Last Week</option>
+                    <option value="720">Last 30 Days</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div id="alertContainer"></div>
+
+        <!-- Stats cards -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card temperature">
+                <div class="stat-label">Temperature</div>
+                <div class="stat-value loading" id="tempValue">--</div>
+                <span class="stat-unit">°C</span>
+                <div class="stat-info" id="tempInfo"></div>
+            </div>
+
+            <div class="stat-card humidity">
+                <div class="stat-label">Humidity</div>
+                <div class="stat-value loading" id="humidityValue">--</div>
+                <span class="stat-unit">%</span>
+                <div class="stat-info" id="humidityInfo"></div>
+            </div>
+
+            <div class="stat-card weight">
+                <div class="stat-label">Weight</div>
+                <div class="stat-value loading" id="weightValue">--</div>
+                <span class="stat-unit">kg</span>
+                <div class="stat-info" id="weightInfo"></div>
+            </div>
+
+            <div class="stat-card battery">
+                <div class="stat-label">Battery</div>
+                <div class="stat-value loading" id="batteryValue">--</div>
+                <span class="stat-unit">V</span>
+                <div class="stat-info" id="batteryInfo"></div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h3 class="chart-title">Temperature & Humidity</h3>
+                <div class="chart-canvas">
+                    <canvas id="tempHumidityChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3 class="chart-title">Hive Weight</h3>
+                <div class="chart-canvas">
+                    <canvas id="weightChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3 class="chart-title">Battery Voltage</h3>
+                <div class="chart-canvas">
+                    <canvas id="batteryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>BeezScale v1.0 | Arduino Beehive Scale with WiFi + Local MQTT | © 2025 Jeremy JEANNE</p>
+    </div>
+
+    <script>
+        // ==========================================
+        // WebSocket Connection
+        // ==========================================
+
+        const socket = io();
+
+        socket.on('connect', function() {
+            updateConnectionStatus(true);
+        });
+
+        socket.on('disconnect', function() {
+            updateConnectionStatus(false);
+        });
+
+        socket.on('initial_data', function(data) {
+            populateHiveList(data.hives);
+        });
+
+        socket.on('new_reading', function(data) {
+            if (selectedHiveId === data.hive_id) {
+                updateStatsDisplay(data);
+                loadChartData();
+            }
+        });
+
+        // ==========================================
+        // State Management
+        // ==========================================
+
+        let selectedHiveId = null;
+        let selectedTimeRange = 24;
+        let charts = {};
+
+        // ==========================================
+        // UI Functions
+        // ==========================================
+
+        function updateConnectionStatus(connected) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        function populateHiveList(hives) {
+            const select = document.getElementById('hiveSelect');
+            const currentValue = select.value;
+
+            select.innerHTML = '<option value="">-- Select a hive --</option>';
+
+            hives.forEach(hive => {
+                const option = document.createElement('option');
+                option.value = hive.hive_id;
+                option.textContent = `${hive.name} (${hive.hive_id})`;
+                select.appendChild(option);
+            });
+
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        }
+
+        function updateStatsDisplay(data) {
+            const formatTime = (timestamp) => {
+                return new Date(timestamp).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            };
+
+            // Temperature
+            document.getElementById('tempValue').textContent = data.temperature?.toFixed(1) || '--';
+            document.getElementById('tempValue').classList.remove('loading');
+            document.getElementById('tempInfo').textContent = `Last update: ${formatTime(data.timestamp)}`;
+
+            // Humidity
+            document.getElementById('humidityValue').textContent = data.humidity?.toFixed(1) || '--';
+            document.getElementById('humidityValue').classList.remove('loading');
+            document.getElementById('humidityInfo').textContent = `Last update: ${formatTime(data.timestamp)}`;
+
+            // Weight
+            document.getElementById('weightValue').textContent = (data.weight / 1000)?.toFixed(2) || '--';
+            document.getElementById('weightValue').classList.remove('loading');
+            document.getElementById('weightInfo').textContent = `Last update: ${formatTime(data.timestamp)}`;
+
+            // Battery
+            document.getElementById('batteryValue').textContent = data.battery_voltage?.toFixed(2) || '--';
+            document.getElementById('batteryValue').classList.remove('loading');
+            document.getElementById('batteryInfo').textContent = `Last update: ${formatTime(data.timestamp)}`;
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // ==========================================
+        // Event Listeners
+        // ==========================================
+
+        document.getElementById('hiveSelect').addEventListener('change', function(e) {
+            selectedHiveId = e.target.value;
+            if (selectedHiveId) {
+                loadHiveData();
+            } else {
+                clearStats();
+            }
+        });
+
+        document.getElementById('timeRangeSelect').addEventListener('change', function(e) {
+            selectedTimeRange = parseInt(e.target.value);
+            if (selectedHiveId) {
+                loadChartData();
+            }
+        });
+
+        // ==========================================
+        // Data Loading Functions
+        // ==========================================
+
+        function loadHiveData() {
+            if (!selectedHiveId) return;
+
+            fetch(`/api/hive/${selectedHiveId}/latest`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateStatsDisplay(data.data);
+                    } else {
+                        showAlert(`No data available for ${selectedHiveId}`, 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading hive data:', error);
+                    showAlert('Error loading data', 'danger');
+                });
+
+            loadChartData();
+        }
+
+        function loadChartData() {
+            if (!selectedHiveId) return;
+
+            fetch(`/api/hive/${selectedHiveId}/history?hours=${selectedTimeRange}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateCharts(data.data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading chart data:', error);
+                });
+
+            fetch(`/api/hive/${selectedHiveId}/stats?hours=${selectedTimeRange}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Stats data available but we're already showing latest
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading stats:', error);
+                });
+        }
+
+        function updateCharts(readings) {
+            if (!readings || readings.length === 0) {
+                showAlert('No data available for selected time range', 'info');
+                return;
+            }
+
+            const labels = readings.map(r => {
+                const date = new Date(r.timestamp);
+                return date.toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            });
+
+            const temperatures = readings.map(r => r.temperature);
+            const humidities = readings.map(r => r.humidity);
+            const weights = readings.map(r => r.weight / 1000); // Convert to kg
+            const batteries = readings.map(r => r.battery_voltage);
+
+            // Temperature & Humidity Chart
+            updateChart('tempHumidityChart', {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Temperature (°C)',
+                        data: temperatures,
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Humidity (%)',
+                        data: humidities,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y1'
+                    }
+                ]
+            }, {
+                type: 'line',
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Temperature (°C)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Humidity (%)' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+
+            // Weight Chart
+            updateChart('weightChart', {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Weight (kg)',
+                        data: weights,
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            }, {
+                type: 'line',
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'Weight (kg)' }
+                        }
+                    }
+                }
+            });
+
+            // Battery Chart
+            updateChart('batteryChart', {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Battery (V)',
+                        data: batteries,
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            }, {
+                type: 'line',
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 6,
+                            title: { display: true, text: 'Voltage (V)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(canvasId, data, config) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+
+            charts[canvasId] = new Chart(ctx, {
+                type: config.type || 'line',
+                data: data,
+                options: config.options || {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        function clearStats() {
+            document.getElementById('tempValue').textContent = '--';
+            document.getElementById('tempValue').classList.add('loading');
+            document.getElementById('humidityValue').textContent = '--';
+            document.getElementById('humidityValue').classList.add('loading');
+            document.getElementById('weightValue').textContent = '--';
+            document.getElementById('weightValue').classList.add('loading');
+            document.getElementById('batteryValue').textContent = '--';
+            document.getElementById('batteryValue').classList.add('loading');
+
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
+        }
+
+        // ==========================================
+        // Initialize on page load
+        // ==========================================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            showAlert('Dashboard loaded. Select a hive to view data.', 'info');
+        });
+    </script>
+</body>
+</html>

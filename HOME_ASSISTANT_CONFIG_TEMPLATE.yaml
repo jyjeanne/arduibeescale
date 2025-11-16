@@ -1,0 +1,307 @@
+# Home Assistant Configuration Template for ArduiBeeScale
+#
+# Copy this to /config/configuration.yaml in Home Assistant
+# Update the values marked with ← CHANGE THIS
+# Restart Home Assistant after changes
+#
+# Date: 2025-11-16
+
+# Homeassistant Configuration
+homeassistant:
+  name: Mon Rucher                           # ← CHANGE THIS: Your home name
+  latitude: 48.8566                           # ← CHANGE THIS: Your latitude
+  longitude: 2.3522                           # ← CHANGE THIS: Your longitude
+  elevation: 35                                # ← CHANGE THIS: Your elevation in meters
+  unit_system: metric
+  time_zone: Europe/Paris                      # ← CHANGE THIS: Your timezone
+
+# HTTP Configuration
+http:
+  server_port: 8123
+  # Uncomment below for HTTPS (requires SSL certificate)
+  # ssl_certificate: /config/ssl/fullchain.pem
+  # ssl_key: /config/ssl/privkey.pem
+
+# MQTT Broker Configuration
+mqtt:
+  broker: 192.168.1.100                       # ← CHANGE THIS: Your MQTT broker IP
+  port: 1883
+  client_id: home-assistant
+  username: homeassistant                     # ← CHANGE THIS: Your MQTT username
+  password: your_mqtt_password                # ← CHANGE THIS: Your MQTT password
+  discovery: true
+  discovery_prefix: homeassistant
+  birth_message:
+    topic: "hass/status"
+    payload: "online"
+  will_message:
+    topic: "hass/status"
+    payload: "offline"
+
+# ==============================================================================
+# MQTT SENSORS FOR ARDUIBEESCALE
+# ==============================================================================
+
+sensor:
+  # ────────────────────────────────────────────────────────────────────────
+  # RUCHE 001 - Main Hive (Update MQTT topic if different)
+  # ────────────────────────────────────────────────────────────────────────
+
+  # Temperature Sensor
+  - platform: mqtt
+    name: "Température Ruche 001"
+    unique_id: "temp_ruche_001"
+    state_topic: "beehive/hive-001"
+    value_template: "{{ value_json.temperature }}"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+    device_class: temperature
+    availability_topic: "beehive/hive-001/status"
+    payload_available: "online"
+    payload_not_available: "offline"
+    state_class: measurement
+    suggest_display_precision: 1
+
+  # Humidity Sensor
+  - platform: mqtt
+    name: "Humidité Ruche 001"
+    unique_id: "humidity_ruche_001"
+    state_topic: "beehive/hive-001"
+    value_template: "{{ value_json.humidity }}"
+    unit_of_measurement: "%"
+    icon: mdi:water-percent
+    device_class: humidity
+    state_class: measurement
+    suggest_display_precision: 0
+
+  # Weight Sensor
+  - platform: mqtt
+    name: "Poids Ruche 001"
+    unique_id: "weight_ruche_001"
+    state_topic: "beehive/hive-001"
+    value_template: "{{ value_json.weight }}"
+    unit_of_measurement: "kg"
+    icon: mdi:weight
+    device_class: weight
+    state_class: measurement
+    suggest_display_precision: 2
+
+  # Battery Percentage
+  - platform: mqtt
+    name: "Batterie Ruche 001"
+    unique_id: "battery_ruche_001"
+    state_topic: "beehive/hive-001"
+    value_template: "{{ value_json.battery_percent }}"
+    unit_of_measurement: "%"
+    icon: mdi:battery
+    device_class: battery
+    state_class: measurement
+    suggest_display_precision: 0
+
+  # Battery Voltage
+  - platform: mqtt
+    name: "Tension Batterie Ruche 001"
+    unique_id: "battery_voltage_ruche_001"
+    state_topic: "beehive/hive-001"
+    value_template: "{{ value_json.battery_voltage }}"
+    unit_of_measurement: "V"
+    icon: mdi:flash
+    device_class: voltage
+    state_class: measurement
+    suggest_display_precision: 2
+
+  # ────────────────────────────────────────────────────────────────────────
+  # OPTIONAL: RUCHE 002 (Uncomment and update topic if you have second hive)
+  # ────────────────────────────────────────────────────────────────────────
+
+  # - platform: mqtt
+  #   name: "Température Ruche 002"
+  #   unique_id: "temp_ruche_002"
+  #   state_topic: "beehive/hive-002"
+  #   value_template: "{{ value_json.temperature }}"
+  #   unit_of_measurement: "°C"
+  #   icon: mdi:thermometer
+  #   device_class: temperature
+
+  # - platform: mqtt
+  #   name: "Poids Ruche 002"
+  #   unique_id: "weight_ruche_002"
+  #   state_topic: "beehive/hive-002"
+  #   value_template: "{{ value_json.weight }}"
+  #   unit_of_measurement: "kg"
+  #   icon: mdi:weight
+  #   device_class: weight
+
+# ==============================================================================
+# TEMPLATE SENSORS (Optional: calculated values)
+# ==============================================================================
+
+template:
+  - sensor:
+      # Net Weight (excluding empty hive box ~35kg)
+      - name: "Poids Net Ruche 001"
+        unique_id: "weight_net_ruche_001"
+        unit_of_measurement: "kg"
+        state_class: measurement
+        icon: mdi:scale
+        state: >
+          {% set gross = states('sensor.poids_ruche_001') | float(0) %}
+          {% set tare = 35 %}
+          {{ ((gross - tare) | round(2)) }}
+
+      # Temperature Status
+      - name: "État Température Ruche 001"
+        unique_id: "temp_status_ruche_001"
+        state: >
+          {% set temp = states('sensor.temperature_ruche_001') | float(0) %}
+          {% if temp > 35 %}
+            🔴 Trop élevée
+          {% elif temp > 30 %}
+            🟡 Élevée
+          {% elif temp < 10 %}
+            🔵 Trop basse
+          {% else %}
+            🟢 Normale
+          {% endif %}
+
+      # Battery Status
+      - name: "État Batterie Ruche 001"
+        unique_id: "battery_status_ruche_001"
+        state: >
+          {% set battery = states('sensor.batterie_ruche_001') | float(0) %}
+          {% if battery > 50 %}
+            🟢 Bonne ({{ battery }}%)
+          {% elif battery > 20 %}
+            🟡 Faible ({{ battery }}%)
+          {% else %}
+            🔴 Critique ({{ battery }}%)
+          {% endif %}
+
+# ==============================================================================
+# HISTORY CONFIGURATION
+# ==============================================================================
+
+history:
+  purge_keep_days: 365              # Keep 1 year of history
+  exclude:
+    domains:
+      - updater
+      - automation
+      - person
+    entities:
+      - sun.sun
+      - moon.moon
+
+# ==============================================================================
+# RECORDER CONFIGURATION (Database)
+# ==============================================================================
+
+recorder:
+  db_url: sqlite:///config/beehive_history.db
+  purge_keep_days: 365
+  auto_purge: true
+  auto_purge_of_states_and_events: true
+  include:
+    domains:
+      - sensor
+    entities:
+      - sensor.temperature_ruche_001
+      - sensor.humidity_ruche_001
+      - sensor.poids_ruche_001
+      - sensor.batterie_ruche_001
+
+# ==============================================================================
+# AUTOMATIONS
+# ==============================================================================
+
+automation: !include automations.yaml
+
+# ==============================================================================
+# SCRIPTS
+# ==============================================================================
+
+script: !include scripts.yaml
+
+# ==============================================================================
+# INTEGRATIONS
+# ==============================================================================
+
+# Default integrations
+default_config:
+
+# YAML Editor
+lovelace:
+  mode: yaml
+  # mode: storage  # Comment above line and uncomment this for UI editor
+
+# ==============================================================================
+# FRONTEND
+# ==============================================================================
+
+frontend:
+  extra_module_url:
+    - /customweb/community/car-card/car-card.js
+
+# ==============================================================================
+# LOGGING (For debugging MQTT issues)
+# ==============================================================================
+
+logger:
+  default: info
+  logs:
+    homeassistant.components.mqtt: debug
+    # Uncomment for more verbose logging:
+    # homeassistant.core: debug
+
+# ==============================================================================
+# NOTIFICATIONS (Email, Mobile, etc.)
+# ==============================================================================
+
+# Built-in notify service
+notify:
+  - platform: file
+    name: "Fichier Log"
+    filename: /config/ruche_alerts.log
+
+  # Uncomment below for email notifications
+  # - platform: smtp
+  #   name: "Email"
+  #   server: smtp.gmail.com
+  #   port: 587
+  #   timeout: 15
+  #   sender: your_email@gmail.com        # ← CHANGE THIS
+  #   encryption: tls
+  #   username: your_email@gmail.com      # ← CHANGE THIS
+  #   password: your_app_password         # ← CHANGE THIS (App password, not regular password)
+  #   recipient:
+  #     - recipient@example.com           # ← CHANGE THIS
+
+  # Uncomment below for Telegram notifications (requires Telegram bot)
+  # - platform: telegram
+  #   name: "Telegram"
+  #   api_key: YOUR_TELEGRAM_BOT_TOKEN    # ← CHANGE THIS
+  #   chat_id: YOUR_TELEGRAM_CHAT_ID      # ← CHANGE THIS
+
+# ==============================================================================
+# GROUPS (Optional: organize entities)
+# ==============================================================================
+
+group:
+  ruche_001:
+    name: "État Ruche 001"
+    entities:
+      - sensor.temperature_ruche_001
+      - sensor.humidity_ruche_001
+      - sensor.poids_ruche_001
+      - sensor.batterie_ruche_001
+
+# ==============================================================================
+# DEVELOPER TOOLS
+# ==============================================================================
+
+# Enable development tools
+development_mode: true
+
+# Enable template debugging (check logs for template rendering)
+template:
+  trigger_on: all

@@ -1,0 +1,27 @@
+[Unit]
+Description=BeezScale Flask Web Server
+After=network.target beehive-subscriber.service
+Wants=beehive-subscriber.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/beehive-monitor
+ExecStart=/usr/bin/python3 /home/pi/beehive-monitor/app.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment="FLASK_ENV=production"
+Environment="PYTHONUNBUFFERED=1"
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/home/pi/beehive-monitor
+
+[Install]
+WantedBy=multi-user.target

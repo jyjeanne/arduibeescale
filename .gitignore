@@ -1,0 +1,29 @@
+# Sensitive configuration files - never commit these
+arduino/config.h
+attiny/config.h
+calibrate/config.h
+
+# IDE and build artifacts
+.DS_Store
+.vscode/
+.idea/
+*.o
+*.a
+*.swp
+*.swo
+*~
+
+# Build output
+build/
+dist/
+*.hex
+*.elf
+
+# OS files
+Thumbs.db
+.directory
+
+# Temporary files
+*.tmp
+*.log
+*.bak

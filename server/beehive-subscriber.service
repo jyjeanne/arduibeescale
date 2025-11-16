@@ -1,0 +1,25 @@
+[Unit]
+Description=BeezScale MQTT Subscriber Service
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/beehive-monitor
+ExecStart=/usr/bin/python3 /home/pi/beehive-monitor/mqtt_subscriber.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/home/pi/beehive-monitor
+
+[Install]
+WantedBy=multi-user.target
