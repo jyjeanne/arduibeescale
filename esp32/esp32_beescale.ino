@@ -86,13 +86,11 @@
 // MQTT TOPICS FOR HOME ASSISTANT
 //============================================
 
-// Base topic for all beehive data
-#define MQTT_BASE_TOPIC      "homeassistant"
+// State and availability topics
 #define MQTT_STATE_TOPIC     "beehive/" HIVE_ID "/state"
 #define MQTT_AVAILABILITY    "beehive/" HIVE_ID "/availability"
 
-// Home Assistant discovery topics
-#define HA_DISCOVERY_PREFIX  "homeassistant"
+// Note: HA_DISCOVERY_PREFIX is defined in config.h
 
 //============================================
 // SENSOR VALIDATION RANGES
@@ -295,7 +293,7 @@ void publishHADiscovery() {
     device["name"] = String(HIVE_NAME);
     device["model"] = "ArduiBeeScale ESP32";
     device["manufacturer"] = "DIY";
-    device["sw_version"] = "4.0";
+    device["sw_version"] = "4.1";
 
     // === Weight Sensor ===
     doc.clear();

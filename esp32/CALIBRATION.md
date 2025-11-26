@@ -24,8 +24,8 @@ Edit `config.h` temporarily:
 ```cpp
 // Temporary calibration values
 #define SCALE_CALIBRATION    1.0    // Raw output
-#define SCALE_OFFSET         0      // No offset
-#define DEBUG_ENABLED        true   // Enable serial output
+#define SCALE_OFFSET         0L     // No offset (L suffix for long type)
+#define DEBUG_ENABLED        1      // Enable serial output (1=on, 0=off)
 
 // Optionally reduce sleep for faster testing
 #define SLEEP_INTERVAL_HOURS 0.01   // ~36 seconds (for testing only!)
@@ -119,7 +119,7 @@ Once calibrated, restore production settings:
 
 ```cpp
 #define SLEEP_INTERVAL_HOURS 2          // Normal interval
-#define DEBUG_ENABLED        false      // Disable for battery life
+#define DEBUG_ENABLED        0          // Disable for battery life (0=off)
 ```
 
 ## Calibration Tips

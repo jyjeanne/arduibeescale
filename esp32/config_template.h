@@ -71,8 +71,8 @@
                                                     // Positive or negative depending on load cell wiring
                                                     // Typical range: -25000 to 25000
 
-#define SCALE_OFFSET         0                     // CHANGE THIS: Your scale offset (tare value)
-                                                    // Raw reading when scale is empty
+#define SCALE_OFFSET         0L                    // CHANGE THIS: Your scale offset (tare value)
+                                                    // Raw reading when scale is empty (use L suffix for long)
 
 #define SCALE_SAMPLES        10                    // Number of readings to average
                                                     // Higher = more stable, slower
@@ -139,9 +139,9 @@
 // Enable serial output for debugging
 // DISABLE in production to save power
 
-#define DEBUG_ENABLED        true                  // Set to false for production
-                                                    // true  = Serial output enabled (115200 baud)
-                                                    // false = Silent operation (saves ~1mA)
+#define DEBUG_ENABLED        1                     // Set to 0 for production
+                                                    // 1 = Serial output enabled (115200 baud)
+                                                    // 0 = Silent operation (saves ~1mA)
 
 //============================================
 // ADVANCED SETTINGS
