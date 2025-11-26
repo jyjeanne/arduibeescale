@@ -27,6 +27,7 @@ Follow these steps in order:
 4. [Dashboard Configuration](#4-dashboard-configuration)
 5. [Alert Automations](#5-alert-automations)
 6. [Advanced Configurations](#6-advanced-configurations)
+7. [Multiple Beehives Setup](#7-multiple-beehives-setup) ← **For 2+ hives**
 
 ---
 
@@ -1255,6 +1256,552 @@ influxdb:
 8. [ ] Create dashboard cards
 9. [ ] Set your thresholds in the dashboard
 10. [ ] Enable alerts toggle
+
+---
+
+## 7. Multiple Beehives Setup
+
+This section explains how to add additional beehives to your monitoring system.
+
+### 7.1 ESP32 Configuration for Each Hive
+
+Each beehive needs its own ESP32 with a **unique HIVE_ID**.
+
+**For Hive 1** (`config.h`):
+```cpp
+#define HIVE_ID              "hive01"
+#define HIVE_NAME            "Garden Hive"
+```
+
+**For Hive 2** (`config.h`):
+```cpp
+#define HIVE_ID              "hive02"
+#define HIVE_NAME            "Orchard Hive"
+```
+
+**For Hive 3** (`config.h`):
+```cpp
+#define HIVE_ID              "hive03"
+#define HIVE_NAME            "Meadow Hive"
+```
+
+> **Important**: Each ESP32 must have a unique `HIVE_ID`. This ID appears in MQTT topics and Home Assistant entity IDs.
+
+### 7.2 Auto-Discovered Entities Per Hive
+
+After each ESP32 connects, Home Assistant automatically creates these entities:
+
+| Hive | Weight | Temperature | Humidity | Battery | WiFi |
+|------|--------|-------------|----------|---------|------|
+| Hive 1 | `sensor.beehive_1_weight` | `sensor.beehive_1_temperature` | `sensor.beehive_1_humidity` | `sensor.beehive_1_battery` | `sensor.beehive_1_wifi_signal` |
+| Hive 2 | `sensor.beehive_2_weight` | `sensor.beehive_2_temperature` | `sensor.beehive_2_humidity` | `sensor.beehive_2_battery` | `sensor.beehive_2_wifi_signal` |
+| Hive 3 | `sensor.beehive_3_weight` | `sensor.beehive_3_temperature` | `sensor.beehive_3_humidity` | `sensor.beehive_3_battery` | `sensor.beehive_3_wifi_signal` |
+
+### 7.3 Helper Entities for Multiple Hives
+
+You can create per-hive thresholds or use global thresholds for all hives.
+
+#### Option A: Global Thresholds (Simpler)
+
+Use the same thresholds for all hives:
+```yaml
+input_number:
+  beehive_min_weight:
+    name: "All Hives - Minimum Weight"
+    min: 0
+    max: 100
+    initial: 15
+    unit_of_measurement: "kg"
+
+  beehive_min_temperature:
+    name: "All Hives - Minimum Temperature"
+    min: 0
+    max: 50
+    initial: 27
+    unit_of_measurement: "°C"
+```
+
+#### Option B: Per-Hive Thresholds (More Control)
+
+Create separate thresholds for each hive:
+```yaml
+input_number:
+  # Hive 1 thresholds
+  hive1_min_weight:
+    name: "Hive 1 - Minimum Weight"
+    min: 0
+    max: 100
+    initial: 15
+    unit_of_measurement: "kg"
+
+  hive1_min_temperature:
+    name: "Hive 1 - Minimum Temperature"
+    min: 0
+    max: 50
+    initial: 27
+    unit_of_measurement: "°C"
+
+  # Hive 2 thresholds
+  hive2_min_weight:
+    name: "Hive 2 - Minimum Weight"
+    min: 0
+    max: 100
+    initial: 15
+    unit_of_measurement: "kg"
+
+  hive2_min_temperature:
+    name: "Hive 2 - Minimum Temperature"
+    min: 0
+    max: 50
+    initial: 27
+    unit_of_measurement: "°C"
+
+  # Hive 3 thresholds
+  hive3_min_weight:
+    name: "Hive 3 - Minimum Weight"
+    min: 0
+    max: 100
+    initial: 15
+    unit_of_measurement: "kg"
+
+  hive3_min_temperature:
+    name: "Hive 3 - Minimum Temperature"
+    min: 0
+    max: 50
+    initial: 27
+    unit_of_measurement: "°C"
+```
+
+### 7.4 Multi-Hive Dashboard Cards
+
+#### All Hives Overview Card
+
+```yaml
+type: entities
+title: "🐝 All Beehives Overview"
+show_header_toggle: false
+entities:
+  - type: section
+    label: "Garden Hive"
+  - entity: sensor.beehive_1_weight
+    name: Weight
+  - entity: sensor.beehive_1_temperature
+    name: Temperature
+  - entity: sensor.beehive_1_battery
+    name: Battery
+  - type: section
+    label: "Orchard Hive"
+  - entity: sensor.beehive_2_weight
+    name: Weight
+  - entity: sensor.beehive_2_temperature
+    name: Temperature
+  - entity: sensor.beehive_2_battery
+    name: Battery
+  - type: section
+    label: "Meadow Hive"
+  - entity: sensor.beehive_3_weight
+    name: Weight
+  - entity: sensor.beehive_3_temperature
+    name: Temperature
+  - entity: sensor.beehive_3_battery
+    name: Battery
+```
+
+#### Multi-Hive Weight Comparison Chart
+
+```yaml
+type: history-graph
+title: "📊 All Hives - Weight Comparison"
+hours_to_show: 168
+entities:
+  - entity: sensor.beehive_1_weight
+    name: Garden Hive
+  - entity: sensor.beehive_2_weight
+    name: Orchard Hive
+  - entity: sensor.beehive_3_weight
+    name: Meadow Hive
+```
+
+#### Multi-Hive Temperature Comparison Chart
+
+```yaml
+type: history-graph
+title: "🌡️ All Hives - Temperature Comparison"
+hours_to_show: 168
+entities:
+  - entity: sensor.beehive_1_temperature
+    name: Garden Hive
+  - entity: sensor.beehive_2_temperature
+    name: Orchard Hive
+  - entity: sensor.beehive_3_temperature
+    name: Meadow Hive
+```
+
+#### Gauge Cards Grid (All Hives)
+
+```yaml
+type: horizontal-stack
+cards:
+  - type: gauge
+    entity: sensor.beehive_1_weight
+    name: "Hive 1"
+    min: 0
+    max: 80
+    severity:
+      green: 30
+      yellow: 15
+      red: 0
+  - type: gauge
+    entity: sensor.beehive_2_weight
+    name: "Hive 2"
+    min: 0
+    max: 80
+    severity:
+      green: 30
+      yellow: 15
+      red: 0
+  - type: gauge
+    entity: sensor.beehive_3_weight
+    name: "Hive 3"
+    min: 0
+    max: 80
+    severity:
+      green: 30
+      yellow: 15
+      red: 0
+```
+
+#### Individual Hive Detail Card
+
+```yaml
+type: vertical-stack
+cards:
+  - type: markdown
+    content: "## 🐝 Garden Hive (Hive 1)"
+  - type: horizontal-stack
+    cards:
+      - type: gauge
+        entity: sensor.beehive_1_weight
+        name: "Weight"
+        unit: "kg"
+        min: 0
+        max: 80
+      - type: gauge
+        entity: sensor.beehive_1_temperature
+        name: "Temp"
+        unit: "°C"
+        min: 0
+        max: 45
+      - type: gauge
+        entity: sensor.beehive_1_humidity
+        name: "Humidity"
+        unit: "%"
+        min: 0
+        max: 100
+  - type: entities
+    entities:
+      - entity: sensor.beehive_1_battery
+        name: Battery
+      - entity: sensor.beehive_1_wifi_signal
+        name: WiFi Signal
+```
+
+### 7.5 Multi-Hive Alert Automations
+
+#### Temperature Alert (All Hives)
+
+```yaml
+alias: "🐝 All Hives - Temperature Alert"
+description: "Alert when any hive temperature drops below threshold"
+mode: parallel
+max: 10
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.beehive_1_temperature
+    below: input_number.beehive_min_temperature
+    for:
+      minutes: 10
+    id: hive1
+  - platform: numeric_state
+    entity_id: sensor.beehive_2_temperature
+    below: input_number.beehive_min_temperature
+    for:
+      minutes: 10
+    id: hive2
+  - platform: numeric_state
+    entity_id: sensor.beehive_3_temperature
+    below: input_number.beehive_min_temperature
+    for:
+      minutes: 10
+    id: hive3
+condition:
+  - condition: state
+    entity_id: input_boolean.beehive_alerts_enabled
+    state: "on"
+action:
+  - service: notify.email_beehive_alert
+    data:
+      title: "🐝 BEEHIVE TEMPERATURE ALERT"
+      message: >-
+        ⚠️ Temperature alert!
+
+        {% if trigger.id == 'hive1' %}
+        🏠 Hive: Garden Hive (Hive 1)
+        🌡️ Temperature: {{ states('sensor.beehive_1_temperature') }}°C
+        {% elif trigger.id == 'hive2' %}
+        🏠 Hive: Orchard Hive (Hive 2)
+        🌡️ Temperature: {{ states('sensor.beehive_2_temperature') }}°C
+        {% elif trigger.id == 'hive3' %}
+        🏠 Hive: Meadow Hive (Hive 3)
+        🌡️ Temperature: {{ states('sensor.beehive_3_temperature') }}°C
+        {% endif %}
+
+        ⚙️ Threshold: {{ states('input_number.beehive_min_temperature') }}°C
+        ⏰ Time: {{ now().strftime('%Y-%m-%d %H:%M') }}
+
+        --
+        ArduiBeeScale Multi-Hive Monitor
+```
+
+#### Weight Alert (All Hives)
+
+```yaml
+alias: "🐝 All Hives - Weight Alert"
+description: "Alert when any hive weight drops below threshold"
+mode: parallel
+max: 10
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.beehive_1_weight
+    below: input_number.beehive_min_weight
+    for:
+      minutes: 30
+    id: hive1
+  - platform: numeric_state
+    entity_id: sensor.beehive_2_weight
+    below: input_number.beehive_min_weight
+    for:
+      minutes: 30
+    id: hive2
+  - platform: numeric_state
+    entity_id: sensor.beehive_3_weight
+    below: input_number.beehive_min_weight
+    for:
+      minutes: 30
+    id: hive3
+condition:
+  - condition: state
+    entity_id: input_boolean.beehive_alerts_enabled
+    state: "on"
+action:
+  - service: notify.email_beehive_alert
+    data:
+      title: "🐝 BEEHIVE WEIGHT ALERT"
+      message: >-
+        ⚠️ Low weight alert!
+
+        {% if trigger.id == 'hive1' %}
+        🏠 Hive: Garden Hive (Hive 1)
+        ⚖️ Weight: {{ states('sensor.beehive_1_weight') }} kg
+        {% elif trigger.id == 'hive2' %}
+        🏠 Hive: Orchard Hive (Hive 2)
+        ⚖️ Weight: {{ states('sensor.beehive_2_weight') }} kg
+        {% elif trigger.id == 'hive3' %}
+        🏠 Hive: Meadow Hive (Hive 3)
+        ⚖️ Weight: {{ states('sensor.beehive_3_weight') }} kg
+        {% endif %}
+
+        ⚙️ Threshold: {{ states('input_number.beehive_min_weight') }} kg
+        ⏰ Time: {{ now().strftime('%Y-%m-%d %H:%M') }}
+
+        --
+        ArduiBeeScale Multi-Hive Monitor
+```
+
+#### Swarm Detection (All Hives)
+
+```yaml
+alias: "🐝 All Hives - Swarm Detection"
+description: "Detect sudden weight drop in any hive (possible swarm)"
+mode: parallel
+max: 10
+trigger:
+  - platform: state
+    entity_id: sensor.beehive_1_weight
+    id: hive1
+  - platform: state
+    entity_id: sensor.beehive_2_weight
+    id: hive2
+  - platform: state
+    entity_id: sensor.beehive_3_weight
+    id: hive3
+condition:
+  - condition: state
+    entity_id: input_boolean.beehive_alerts_enabled
+    state: "on"
+  - condition: template
+    value_template: >-
+      {% set old = trigger.from_state.state | float(0) %}
+      {% set new = trigger.to_state.state | float(0) %}
+      {{ (old - new) > 1.5 }}
+action:
+  - service: notify.email_beehive_alert
+    data:
+      title: "🐝🚨 POSSIBLE SWARM DETECTED!"
+      message: >-
+        ⚠️ Sudden weight drop detected!
+
+        {% if trigger.id == 'hive1' %}
+        🏠 Hive: Garden Hive (Hive 1)
+        {% elif trigger.id == 'hive2' %}
+        🏠 Hive: Orchard Hive (Hive 2)
+        {% elif trigger.id == 'hive3' %}
+        🏠 Hive: Meadow Hive (Hive 3)
+        {% endif %}
+
+        ⚖️ Previous: {{ trigger.from_state.state }} kg
+        ⚖️ Current: {{ trigger.to_state.state }} kg
+        📉 Drop: {{ (trigger.from_state.state | float - trigger.to_state.state | float) | round(2) }} kg
+
+        This may indicate:
+        • Swarming event
+        • Honey harvest (if expected)
+        • Equipment issue
+
+        Please check your hive!
+
+        --
+        ArduiBeeScale Multi-Hive Monitor
+```
+
+#### Daily Summary (All Hives)
+
+```yaml
+alias: "🐝 All Hives - Daily Summary"
+description: "Daily report of all hives at 8 AM"
+mode: single
+trigger:
+  - platform: time
+    at: "08:00:00"
+action:
+  - service: notify.email_beehive_alert
+    data:
+      title: "🐝 Daily Apiary Report"
+      message: >-
+        Good morning! Here's your daily beehive summary:
+
+        ═══════════════════════════════
+        🏠 GARDEN HIVE (Hive 1)
+        ═══════════════════════════════
+        ⚖️ Weight: {{ states('sensor.beehive_1_weight') }} kg
+        🌡️ Temperature: {{ states('sensor.beehive_1_temperature') }}°C
+        💧 Humidity: {{ states('sensor.beehive_1_humidity') }}%
+        🔋 Battery: {{ states('sensor.beehive_1_battery') }}%
+
+        ═══════════════════════════════
+        🏠 ORCHARD HIVE (Hive 2)
+        ═══════════════════════════════
+        ⚖️ Weight: {{ states('sensor.beehive_2_weight') }} kg
+        🌡️ Temperature: {{ states('sensor.beehive_2_temperature') }}°C
+        💧 Humidity: {{ states('sensor.beehive_2_humidity') }}%
+        🔋 Battery: {{ states('sensor.beehive_2_battery') }}%
+
+        ═══════════════════════════════
+        🏠 MEADOW HIVE (Hive 3)
+        ═══════════════════════════════
+        ⚖️ Weight: {{ states('sensor.beehive_3_weight') }} kg
+        🌡️ Temperature: {{ states('sensor.beehive_3_temperature') }}°C
+        💧 Humidity: {{ states('sensor.beehive_3_humidity') }}%
+        🔋 Battery: {{ states('sensor.beehive_3_battery') }}%
+
+        ═══════════════════════════════
+        🌤️ WEATHER
+        ═══════════════════════════════
+        Condition: {{ states('weather.home') }}
+        Wind: {{ state_attr('weather.home', 'wind_speed') | default('N/A') }} km/h
+
+        Have a great day! 🌻
+
+        --
+        ArduiBeeScale Multi-Hive Monitor
+```
+
+### 7.6 Template Sensors for Multiple Hives
+
+```yaml
+template:
+  - sensor:
+      # Total apiary weight
+      - name: "Apiary Total Weight"
+        unique_id: apiary_total_weight
+        unit_of_measurement: "kg"
+        state_class: measurement
+        icon: mdi:scale
+        state: >-
+          {% set h1 = states('sensor.beehive_1_weight') | float(0) %}
+          {% set h2 = states('sensor.beehive_2_weight') | float(0) %}
+          {% set h3 = states('sensor.beehive_3_weight') | float(0) %}
+          {{ (h1 + h2 + h3) | round(2) }}
+
+      # Average hive temperature
+      - name: "Apiary Average Temperature"
+        unique_id: apiary_avg_temperature
+        unit_of_measurement: "°C"
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >-
+          {% set temps = [
+            states('sensor.beehive_1_temperature') | float(0),
+            states('sensor.beehive_2_temperature') | float(0),
+            states('sensor.beehive_3_temperature') | float(0)
+          ] | select('gt', 0) | list %}
+          {% if temps | length > 0 %}
+            {{ (temps | sum / temps | length) | round(1) }}
+          {% else %}
+            0
+          {% endif %}
+
+      # Count of online hives
+      - name: "Apiary Hives Online"
+        unique_id: apiary_hives_online
+        icon: mdi:beehive-outline
+        state: >-
+          {% set count = 0 %}
+          {% if states('sensor.beehive_1_weight') not in ['unknown', 'unavailable'] %}
+            {% set count = count + 1 %}
+          {% endif %}
+          {% if states('sensor.beehive_2_weight') not in ['unknown', 'unavailable'] %}
+            {% set count = count + 1 %}
+          {% endif %}
+          {% if states('sensor.beehive_3_weight') not in ['unknown', 'unavailable'] %}
+            {% set count = count + 1 %}
+          {% endif %}
+          {{ count }} / 3
+
+      # Lowest battery across all hives
+      - name: "Apiary Lowest Battery"
+        unique_id: apiary_lowest_battery
+        unit_of_measurement: "%"
+        device_class: battery
+        icon: mdi:battery-alert
+        state: >-
+          {% set batteries = [
+            states('sensor.beehive_1_battery') | float(100),
+            states('sensor.beehive_2_battery') | float(100),
+            states('sensor.beehive_3_battery') | float(100)
+          ] %}
+          {{ batteries | min | round(0) }}
+```
+
+### 7.7 Quick Checklist for Adding a New Hive
+
+1. [ ] Build new ESP32 unit with sensors
+2. [ ] Create `config.h` with unique `HIVE_ID` (e.g., "hive04")
+3. [ ] Upload firmware to new ESP32
+4. [ ] Verify sensors appear in Home Assistant
+5. [ ] Add new hive to dashboard cards
+6. [ ] Update automations to include new entity IDs
+7. [ ] (Optional) Create per-hive threshold helpers
 
 ---
 

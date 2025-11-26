@@ -913,3 +913,317 @@ complete_dashboard_view: |
               name: Min Weight
             - entity: input_number.storm_wind_threshold
               name: Wind Threshold
+
+
+# =============================================================================
+# PART 5: MULTIPLE BEEHIVES CONFIGURATION
+# =============================================================================
+# Examples for monitoring multiple hives (2-10 hives)
+# Each ESP32 needs unique HIVE_ID in config.h: "hive01", "hive02", "hive03", etc.
+
+# -----------------------------------------------------------------------------
+# CARD: All Hives Overview
+# -----------------------------------------------------------------------------
+
+multi_hive_overview_card: |
+  type: entities
+  title: "🐝 All Beehives Overview"
+  show_header_toggle: false
+  entities:
+    - type: section
+      label: "Garden Hive (1)"
+    - entity: sensor.beehive_1_weight
+      name: Weight
+    - entity: sensor.beehive_1_temperature
+      name: Temperature
+    - entity: sensor.beehive_1_battery
+      name: Battery
+    - type: section
+      label: "Orchard Hive (2)"
+    - entity: sensor.beehive_2_weight
+      name: Weight
+    - entity: sensor.beehive_2_temperature
+      name: Temperature
+    - entity: sensor.beehive_2_battery
+      name: Battery
+    - type: section
+      label: "Meadow Hive (3)"
+    - entity: sensor.beehive_3_weight
+      name: Weight
+    - entity: sensor.beehive_3_temperature
+      name: Temperature
+    - entity: sensor.beehive_3_battery
+      name: Battery
+
+
+# -----------------------------------------------------------------------------
+# CARD: Multi-Hive Weight Comparison Chart
+# -----------------------------------------------------------------------------
+
+multi_hive_weight_chart: |
+  type: history-graph
+  title: "📊 All Hives - Weight Comparison"
+  hours_to_show: 168
+  entities:
+    - entity: sensor.beehive_1_weight
+      name: Garden Hive
+    - entity: sensor.beehive_2_weight
+      name: Orchard Hive
+    - entity: sensor.beehive_3_weight
+      name: Meadow Hive
+
+
+# -----------------------------------------------------------------------------
+# CARD: Multi-Hive Temperature Comparison Chart
+# -----------------------------------------------------------------------------
+
+multi_hive_temp_chart: |
+  type: history-graph
+  title: "🌡️ All Hives - Temperature Comparison"
+  hours_to_show: 168
+  entities:
+    - entity: sensor.beehive_1_temperature
+      name: Garden Hive
+    - entity: sensor.beehive_2_temperature
+      name: Orchard Hive
+    - entity: sensor.beehive_3_temperature
+      name: Meadow Hive
+
+
+# -----------------------------------------------------------------------------
+# CARD: Multi-Hive Weight Gauges
+# -----------------------------------------------------------------------------
+
+multi_hive_gauges: |
+  type: horizontal-stack
+  cards:
+    - type: gauge
+      entity: sensor.beehive_1_weight
+      name: "Hive 1"
+      min: 0
+      max: 80
+      severity:
+        green: 30
+        yellow: 15
+        red: 0
+    - type: gauge
+      entity: sensor.beehive_2_weight
+      name: "Hive 2"
+      min: 0
+      max: 80
+      severity:
+        green: 30
+        yellow: 15
+        red: 0
+    - type: gauge
+      entity: sensor.beehive_3_weight
+      name: "Hive 3"
+      min: 0
+      max: 80
+      severity:
+        green: 30
+        yellow: 15
+        red: 0
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Multi-Hive Temperature Alert
+# -----------------------------------------------------------------------------
+
+automation_multi_hive_temp_alert: |
+  alias: "🐝 All Hives - Temperature Alert"
+  description: "Alert when any hive temperature drops below threshold"
+  mode: parallel
+  max: 10
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.beehive_1_temperature
+      below: input_number.beehive_min_temperature
+      for:
+        minutes: 10
+      id: hive1
+    - platform: numeric_state
+      entity_id: sensor.beehive_2_temperature
+      below: input_number.beehive_min_temperature
+      for:
+        minutes: 10
+      id: hive2
+    - platform: numeric_state
+      entity_id: sensor.beehive_3_temperature
+      below: input_number.beehive_min_temperature
+      for:
+        minutes: 10
+      id: hive3
+  condition:
+    - condition: state
+      entity_id: input_boolean.beehive_alerts_enabled
+      state: "on"
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "🐝 BEEHIVE TEMPERATURE ALERT"
+        message: >-
+          ⚠️ Temperature alert!
+
+          {% if trigger.id == 'hive1' %}
+          🏠 Hive: Garden Hive (Hive 1)
+          🌡️ Temperature: {{ states('sensor.beehive_1_temperature') }}°C
+          {% elif trigger.id == 'hive2' %}
+          🏠 Hive: Orchard Hive (Hive 2)
+          🌡️ Temperature: {{ states('sensor.beehive_2_temperature') }}°C
+          {% elif trigger.id == 'hive3' %}
+          🏠 Hive: Meadow Hive (Hive 3)
+          🌡️ Temperature: {{ states('sensor.beehive_3_temperature') }}°C
+          {% endif %}
+
+          ⚙️ Threshold: {{ states('input_number.beehive_min_temperature') }}°C
+          ⏰ Time: {{ now().strftime('%Y-%m-%d %H:%M') }}
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Multi-Hive Swarm Detection
+# -----------------------------------------------------------------------------
+
+automation_multi_hive_swarm: |
+  alias: "🐝 All Hives - Swarm Detection"
+  description: "Detect sudden weight drop in any hive"
+  mode: parallel
+  max: 10
+  trigger:
+    - platform: state
+      entity_id: sensor.beehive_1_weight
+      id: hive1
+    - platform: state
+      entity_id: sensor.beehive_2_weight
+      id: hive2
+    - platform: state
+      entity_id: sensor.beehive_3_weight
+      id: hive3
+  condition:
+    - condition: state
+      entity_id: input_boolean.beehive_alerts_enabled
+      state: "on"
+    - condition: template
+      value_template: >-
+        {% set old = trigger.from_state.state | float(0) %}
+        {% set new = trigger.to_state.state | float(0) %}
+        {{ (old - new) > 1.5 }}
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "🐝🚨 POSSIBLE SWARM DETECTED!"
+        message: >-
+          ⚠️ Sudden weight drop!
+
+          {% if trigger.id == 'hive1' %}
+          🏠 Hive: Garden Hive (Hive 1)
+          {% elif trigger.id == 'hive2' %}
+          🏠 Hive: Orchard Hive (Hive 2)
+          {% elif trigger.id == 'hive3' %}
+          🏠 Hive: Meadow Hive (Hive 3)
+          {% endif %}
+
+          ⚖️ Before: {{ trigger.from_state.state }} kg
+          ⚖️ After: {{ trigger.to_state.state }} kg
+          📉 Drop: {{ (trigger.from_state.state | float - trigger.to_state.state | float) | round(2) }} kg
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Multi-Hive Daily Summary
+# -----------------------------------------------------------------------------
+
+automation_multi_hive_daily_summary: |
+  alias: "🐝 All Hives - Daily Summary"
+  description: "Daily report of all hives"
+  mode: single
+  trigger:
+    - platform: time
+      at: "08:00:00"
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "🐝 Daily Apiary Report"
+        message: >-
+          Good morning! Daily summary:
+
+          🏠 GARDEN HIVE (1)
+          ⚖️ {{ states('sensor.beehive_1_weight') }} kg
+          🌡️ {{ states('sensor.beehive_1_temperature') }}°C
+          🔋 {{ states('sensor.beehive_1_battery') }}%
+
+          🏠 ORCHARD HIVE (2)
+          ⚖️ {{ states('sensor.beehive_2_weight') }} kg
+          🌡️ {{ states('sensor.beehive_2_temperature') }}°C
+          🔋 {{ states('sensor.beehive_2_battery') }}%
+
+          🏠 MEADOW HIVE (3)
+          ⚖️ {{ states('sensor.beehive_3_weight') }} kg
+          🌡️ {{ states('sensor.beehive_3_temperature') }}°C
+          🔋 {{ states('sensor.beehive_3_battery') }}%
+
+          🌤️ Weather: {{ states('weather.home') }}
+
+
+# -----------------------------------------------------------------------------
+# TEMPLATE SENSORS: Apiary Statistics
+# -----------------------------------------------------------------------------
+
+apiary_template_sensors: |
+  template:
+    - sensor:
+        # Total weight of all hives
+        - name: "Apiary Total Weight"
+          unique_id: apiary_total_weight
+          unit_of_measurement: "kg"
+          state_class: measurement
+          icon: mdi:scale
+          state: >-
+            {% set h1 = states('sensor.beehive_1_weight') | float(0) %}
+            {% set h2 = states('sensor.beehive_2_weight') | float(0) %}
+            {% set h3 = states('sensor.beehive_3_weight') | float(0) %}
+            {{ (h1 + h2 + h3) | round(2) }}
+
+        # Average temperature
+        - name: "Apiary Average Temperature"
+          unique_id: apiary_avg_temperature
+          unit_of_measurement: "°C"
+          state_class: measurement
+          icon: mdi:thermometer
+          state: >-
+            {% set temps = [
+              states('sensor.beehive_1_temperature') | float(0),
+              states('sensor.beehive_2_temperature') | float(0),
+              states('sensor.beehive_3_temperature') | float(0)
+            ] | select('gt', 0) | list %}
+            {{ (temps | sum / temps | length) | round(1) if temps else 0 }}
+
+        # Lowest battery
+        - name: "Apiary Lowest Battery"
+          unique_id: apiary_lowest_battery
+          unit_of_measurement: "%"
+          device_class: battery
+          icon: mdi:battery-alert
+          state: >-
+            {% set batteries = [
+              states('sensor.beehive_1_battery') | float(100),
+              states('sensor.beehive_2_battery') | float(100),
+              states('sensor.beehive_3_battery') | float(100)
+            ] %}
+            {{ batteries | min | round(0) }}
+
+        # Hives online count
+        - name: "Apiary Hives Online"
+          unique_id: apiary_hives_online
+          icon: mdi:beehive-outline
+          state: >-
+            {% set count = namespace(n=0) %}
+            {% if states('sensor.beehive_1_weight') not in ['unknown', 'unavailable'] %}
+              {% set count.n = count.n + 1 %}
+            {% endif %}
+            {% if states('sensor.beehive_2_weight') not in ['unknown', 'unavailable'] %}
+              {% set count.n = count.n + 1 %}
+            {% endif %}
+            {% if states('sensor.beehive_3_weight') not in ['unknown', 'unavailable'] %}
+              {% set count.n = count.n + 1 %}
+            {% endif %}
+            {{ count.n }} / 3

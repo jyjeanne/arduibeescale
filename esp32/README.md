@@ -14,9 +14,10 @@ Monitor your beehives remotely: weight, temperature, humidity, battery level, an
 4. [Shopping List](#shopping-list)
 5. [Step-by-Step Setup Guide](#step-by-step-setup-guide)
 6. [Available Alerts](#available-alerts-summary)
-7. [Project Files](#project-files)
-8. [Troubleshooting](#troubleshooting)
-9. [Solution Comparison](#solution-comparison) ← **Which version to choose?**
+7. [Adding Multiple Beehives](#adding-multiple-beehives) ← **For 2+ hives**
+8. [Project Files](#project-files)
+9. [Troubleshooting](#troubleshooting)
+10. [Solution Comparison](#solution-comparison)
 
 ---
 
@@ -72,6 +73,7 @@ Follow these steps in order:
 - **Long battery life**: 6-12 months on single 18650 cell
 - **Extended WiFi range**: External 3dBi antenna on both ESP32 and Pi
 - **Auto-discovery**: Sensors appear automatically in Home Assistant
+- **Multi-hive support**: Monitor 2-10+ hives with comparison charts
 - **Email alerts**: Temperature, weight, battery, swarm detection, storms
 - **Weather alerts**: Free API monitors storms and sends warnings
 - **LCD display** (optional): Press button to see values on screen
@@ -455,6 +457,26 @@ All thresholds are configurable via Home Assistant UI sliders - no YAML editing 
 
 ---
 
+## Adding Multiple Beehives
+
+Each additional hive needs its own ESP32 with a unique `HIVE_ID`:
+
+| Hive | config.h Setting | Entity Example |
+|------|------------------|----------------|
+| Hive 1 | `#define HIVE_ID "hive01"` | `sensor.beehive_1_weight` |
+| Hive 2 | `#define HIVE_ID "hive02"` | `sensor.beehive_2_weight` |
+| Hive 3 | `#define HIVE_ID "hive03"` | `sensor.beehive_3_weight` |
+
+**Cost per additional hive**: ~€36
+
+See [HOME_ASSISTANT_SETUP.md](HOME_ASSISTANT_SETUP.md#7-multiple-beehives-setup) for:
+- Multi-hive dashboard cards
+- Comparison charts (weight, temperature)
+- Apiary-wide alerts
+- Template sensors (total weight, average temp, lowest battery)
+
+---
+
 ## Project Files
 
 | File | Description |
@@ -463,7 +485,7 @@ All thresholds are configurable via Home Assistant UI sliders - no YAML editing 
 | `config_template.h` | Configuration template (copy to `config.h`) |
 | `WIRING_DIAGRAM.md` | Detailed wiring diagrams |
 | `CALIBRATION.md` | Scale calibration guide |
-| `HOME_ASSISTANT_SETUP.md` | Complete HA setup with email alerts |
+| `HOME_ASSISTANT_SETUP.md` | Complete HA setup with email alerts + multi-hive |
 | `home_assistant_examples.yaml` | Ready-to-use YAML configurations |
 | `platformio.ini` | PlatformIO configuration (alternative to Arduino IDE) |
 
