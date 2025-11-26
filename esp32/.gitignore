@@ -1,0 +1,21 @@
+# Configuration files with secrets
+config.h
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+
+# Arduino IDE
+*.elf
+*.bin
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*~

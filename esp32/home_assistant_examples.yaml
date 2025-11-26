@@ -1,0 +1,915 @@
+# =============================================================================
+# Home Assistant Configuration for ArduiBeeScale
+# =============================================================================
+#
+# This file contains ready-to-use configurations for:
+# - Email notifications
+# - User-configurable alert thresholds
+# - Dashboard cards with charts
+# - Alert automations
+#
+# For detailed setup instructions, see: HOME_ASSISTANT_SETUP.md
+#
+# =============================================================================
+
+
+# =============================================================================
+# PART 1: CONFIGURATION.YAML ADDITIONS
+# =============================================================================
+# Add these sections to your configuration.yaml file
+
+# -----------------------------------------------------------------------------
+# EMAIL NOTIFICATION SETUP (SMTP)
+# -----------------------------------------------------------------------------
+# Configure email alerts - update with your credentials
+# For Gmail: create an App Password at https://myaccount.google.com/apppasswords
+
+notify:
+  - name: email_beehive_alert
+    platform: smtp
+    server: smtp.gmail.com
+    port: 587
+    timeout: 15
+    sender: your_email@gmail.com          # CHANGE THIS
+    encryption: starttls
+    username: your_email@gmail.com        # CHANGE THIS
+    password: !secret gmail_app_password  # Add to secrets.yaml
+    recipient:
+      - alert_recipient@email.com         # CHANGE THIS
+    sender_name: "Beehive Monitor"
+
+
+# -----------------------------------------------------------------------------
+# INPUT HELPERS - User-configurable thresholds
+# -----------------------------------------------------------------------------
+# These create sliders and toggles in the UI for user settings
+
+input_number:
+  # Minimum weight threshold - sends alert when weight drops below
+  beehive_min_weight:
+    name: "Beehive Minimum Weight"
+    icon: mdi:scale-balance
+    min: 0
+    max: 100
+    step: 0.5
+    unit_of_measurement: "kg"
+    initial: 15
+
+  # Minimum temperature threshold - sends alert when temp drops below
+  beehive_min_temperature:
+    name: "Beehive Minimum Temperature"
+    icon: mdi:thermometer-alert
+    min: 0
+    max: 50
+    step: 1
+    unit_of_measurement: "°C"
+    initial: 27
+
+  # Cooldown between alerts to prevent spam
+  beehive_alert_cooldown:
+    name: "Alert Cooldown Hours"
+    icon: mdi:timer
+    min: 1
+    max: 24
+    step: 1
+    unit_of_measurement: "hours"
+    initial: 6
+
+  # Wind speed threshold for storm alerts
+  storm_wind_threshold:
+    name: "Storm Wind Threshold"
+    icon: mdi:weather-windy
+    min: 20
+    max: 100
+    step: 5
+    unit_of_measurement: "km/h"
+    initial: 50
+
+input_boolean:
+  # Master switch to enable/disable all alerts
+  beehive_alerts_enabled:
+    name: "Beehive Alerts Enabled"
+    icon: mdi:bell
+    initial: true
+
+  # Master switch for storm/weather alerts
+  storm_alerts_enabled:
+    name: "Storm Alerts Enabled"
+    icon: mdi:weather-lightning
+    initial: true
+
+input_datetime:
+  # Tracks when last alert was sent (for cooldown)
+  beehive_last_alert:
+    name: "Last Beehive Alert"
+    has_date: true
+    has_time: true
+
+  # Tracks when last storm alert was sent
+  beehive_last_storm_alert:
+    name: "Last Storm Alert"
+    has_date: true
+    has_time: true
+
+
+# -----------------------------------------------------------------------------
+# TEMPLATE SENSORS - Calculated values
+# -----------------------------------------------------------------------------
+template:
+  - sensor:
+      # Estimated honey weight (total - empty hive weight)
+      - name: "Beehive 1 Honey Estimate"
+        unique_id: beehive_1_honey_estimate
+        unit_of_measurement: "kg"
+        state_class: measurement
+        icon: mdi:beehive-outline
+        state: >-
+          {% set total = states('sensor.beehive_1_weight') | float(0) %}
+          {% set empty_hive = 15 %}
+          {% set honey = total - empty_hive %}
+          {{ [honey, 0] | max | round(1) }}
+
+      # Battery days remaining estimate
+      - name: "Beehive 1 Battery Days"
+        unique_id: beehive_1_battery_days
+        unit_of_measurement: "days"
+        icon: mdi:battery-clock
+        state: >-
+          {% set percent = states('sensor.beehive_1_battery') | float(50) %}
+          {% set drain_per_day = 0.5 %}
+          {{ (percent / drain_per_day) | round(0) }}
+
+      # Temperature status text
+      - name: "Beehive 1 Temp Status"
+        unique_id: beehive_1_temp_status
+        icon: >-
+          {% set temp = states('sensor.beehive_1_temperature') | float(30) %}
+          {% if temp < 20 %}mdi:snowflake
+          {% elif temp > 38 %}mdi:fire
+          {% else %}mdi:check-circle{% endif %}
+        state: >-
+          {% set temp = states('sensor.beehive_1_temperature') | float(30) %}
+          {% set threshold = states('input_number.beehive_min_temperature') | float(27) %}
+          {% if temp < threshold %}ALERT
+          {% elif temp < 25 %}Cool
+          {% elif temp <= 36 %}Optimal
+          {% else %}Warm{% endif %}
+
+
+# -----------------------------------------------------------------------------
+# RECORDER - Keep long history for charts
+# -----------------------------------------------------------------------------
+recorder:
+  purge_keep_days: 365
+  commit_interval: 60
+  include:
+    entity_globs:
+      - sensor.beehive_*
+    entities:
+      - input_number.beehive_min_weight
+      - input_number.beehive_min_temperature
+
+
+# =============================================================================
+# PART 2: DASHBOARD CARDS (Lovelace YAML)
+# =============================================================================
+# Add these cards via: Overview → Edit Dashboard → + Add Card → Manual YAML
+
+# -----------------------------------------------------------------------------
+# CARD: Main Status Overview
+# -----------------------------------------------------------------------------
+# Shows current values and alert settings
+
+status_card: |
+  type: entities
+  title: "🐝 Beehive 1 Status"
+  show_header_toggle: false
+  entities:
+    - entity: sensor.beehive_1_weight
+      name: Weight
+      icon: mdi:scale
+    - entity: sensor.beehive_1_temperature
+      name: Temperature
+    - entity: sensor.beehive_1_humidity
+      name: Humidity
+    - entity: sensor.beehive_1_battery
+      name: Battery
+      icon: mdi:battery
+    - entity: sensor.beehive_1_wifi_signal
+      name: WiFi Signal
+      icon: mdi:wifi
+    - type: divider
+    - entity: sensor.beehive_1_honey_estimate
+      name: Est. Honey
+    - entity: sensor.beehive_1_temp_status
+      name: Temp Status
+
+
+# -----------------------------------------------------------------------------
+# CARD: Gauge Row
+# -----------------------------------------------------------------------------
+
+gauges_card: |
+  type: horizontal-stack
+  cards:
+    - type: gauge
+      entity: sensor.beehive_1_weight
+      name: Weight
+      unit: kg
+      min: 0
+      max: 80
+      severity:
+        green: 20
+        yellow: 50
+        red: 70
+      needle: true
+    - type: gauge
+      entity: sensor.beehive_1_temperature
+      name: Temp
+      unit: °C
+      min: 0
+      max: 50
+      severity:
+        red: 0
+        yellow: 20
+        green: 27
+      needle: true
+    - type: gauge
+      entity: sensor.beehive_1_battery
+      name: Battery
+      min: 0
+      max: 100
+      severity:
+        red: 20
+        yellow: 40
+        green: 60
+      needle: true
+
+
+# -----------------------------------------------------------------------------
+# CARD: Temperature History (7 Days)
+# -----------------------------------------------------------------------------
+
+temperature_chart: |
+  type: history-graph
+  title: "🌡️ Temperature History (7 Days)"
+  entities:
+    - entity: sensor.beehive_1_temperature
+      name: Temperature
+  hours_to_show: 168
+  refresh_interval: 300
+
+
+# -----------------------------------------------------------------------------
+# CARD: Humidity History (7 Days)
+# -----------------------------------------------------------------------------
+
+humidity_chart: |
+  type: history-graph
+  title: "💧 Humidity History (7 Days)"
+  entities:
+    - entity: sensor.beehive_1_humidity
+      name: Humidity
+  hours_to_show: 168
+  refresh_interval: 300
+
+
+# -----------------------------------------------------------------------------
+# CARD: Weight History (30 Days)
+# -----------------------------------------------------------------------------
+
+weight_chart: |
+  type: history-graph
+  title: "⚖️ Weight History (30 Days)"
+  entities:
+    - entity: sensor.beehive_1_weight
+      name: Weight
+  hours_to_show: 720
+  refresh_interval: 300
+
+
+# -----------------------------------------------------------------------------
+# CARD: Combined Temperature + Humidity Chart
+# -----------------------------------------------------------------------------
+
+combined_temp_humidity_chart: |
+  type: history-graph
+  title: "🌡️💧 Temperature & Humidity (7 Days)"
+  entities:
+    - entity: sensor.beehive_1_temperature
+      name: Temperature
+    - entity: sensor.beehive_1_humidity
+      name: Humidity
+  hours_to_show: 168
+
+
+# -----------------------------------------------------------------------------
+# CARD: Statistics - Temperature
+# -----------------------------------------------------------------------------
+
+temperature_statistics: |
+  type: statistics-graph
+  title: "Temperature Statistics (7 Days)"
+  entities:
+    - entity: sensor.beehive_1_temperature
+  stat_types:
+    - min
+    - max
+    - mean
+  period:
+    calendar:
+      period: day
+  days_to_show: 7
+
+
+# -----------------------------------------------------------------------------
+# CARD: Statistics - Weight
+# -----------------------------------------------------------------------------
+
+weight_statistics: |
+  type: statistics-graph
+  title: "Weight Statistics (30 Days)"
+  entities:
+    - entity: sensor.beehive_1_weight
+  stat_types:
+    - min
+    - max
+    - mean
+    - change
+  period:
+    calendar:
+      period: day
+  days_to_show: 30
+
+
+# -----------------------------------------------------------------------------
+# CARD: Alert Settings
+# -----------------------------------------------------------------------------
+
+alert_settings_card: |
+  type: entities
+  title: "🔔 Alert Configuration"
+  show_header_toggle: false
+  entities:
+    - entity: input_boolean.beehive_alerts_enabled
+      name: Enable Email Alerts
+    - type: divider
+    - entity: input_number.beehive_min_temperature
+      name: Min Temperature Alert
+    - entity: input_number.beehive_min_weight
+      name: Min Weight Alert
+    - entity: input_number.beehive_alert_cooldown
+      name: Alert Cooldown (hours)
+    - type: divider
+    - entity: input_datetime.beehive_last_alert
+      name: Last Alert Sent
+
+
+# -----------------------------------------------------------------------------
+# CARD: Weather Forecast
+# -----------------------------------------------------------------------------
+
+weather_card: |
+  type: weather-forecast
+  entity: weather.home
+  show_forecast: true
+  name: "Local Weather"
+
+
+# -----------------------------------------------------------------------------
+# CARD: Storm Alert Settings
+# -----------------------------------------------------------------------------
+
+storm_settings_card: |
+  type: entities
+  title: "⛈️ Storm Alert Settings"
+  show_header_toggle: false
+  entities:
+    - entity: input_boolean.storm_alerts_enabled
+      name: Enable Storm Alerts
+    - entity: input_number.storm_wind_threshold
+      name: Wind Speed Threshold
+    - type: divider
+    - entity: weather.home
+      name: Current Weather
+    - entity: input_datetime.beehive_last_storm_alert
+      name: Last Storm Alert
+
+
+# =============================================================================
+# PART 3: AUTOMATIONS
+# =============================================================================
+# Import these via: Settings → Automations → + Create → Import from YAML
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Temperature Alert (Below Threshold)
+# -----------------------------------------------------------------------------
+
+automation_temperature_alert: |
+  alias: "🐝 Beehive Temperature Alert"
+  description: "Send email when temperature drops below user-defined threshold"
+  mode: single
+  trigger:
+    - platform: template
+      value_template: >-
+        {{ states('sensor.beehive_1_temperature') | float(30) <
+           states('input_number.beehive_min_temperature') | float(27) }}
+      for:
+        minutes: 10
+  condition:
+    - condition: state
+      entity_id: input_boolean.beehive_alerts_enabled
+      state: "on"
+    - condition: template
+      value_template: >-
+        {% set last = states('input_datetime.beehive_last_alert') %}
+        {% set cooldown = states('input_number.beehive_alert_cooldown') | float(6) * 3600 %}
+        {% if last == 'unknown' or last == 'unavailable' %}
+          true
+        {% else %}
+          {{ (as_timestamp(now()) - as_timestamp(last)) > cooldown }}
+        {% endif %}
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "🐝 BEEHIVE TEMPERATURE ALERT"
+        message: >-
+          ⚠️ ATTENTION: Beehive temperature is below threshold!
+
+          📍 Hive: Beehive 1
+          🌡️ Current Temperature: {{ states('sensor.beehive_1_temperature') }}°C
+          ⚠️ Threshold: {{ states('input_number.beehive_min_temperature') }}°C
+
+          📊 Current Status:
+          • Weight: {{ states('sensor.beehive_1_weight') }} kg
+          • Humidity: {{ states('sensor.beehive_1_humidity') }}%
+          • Battery: {{ states('sensor.beehive_1_battery') }}%
+
+          ⏰ Time: {{ now().strftime('%Y-%m-%d %H:%M') }}
+
+          🔧 Low temperature may indicate:
+          • Colony is weak or stressed
+          • Queen problems
+          • Need for insulation
+
+          --
+          ArduiBeeScale Monitoring System
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.beehive_last_alert
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Weight Alert (Below Threshold)
+# -----------------------------------------------------------------------------
+
+automation_weight_alert: |
+  alias: "🐝 Beehive Weight Alert"
+  description: "Send email when weight drops below user-defined threshold"
+  mode: single
+  trigger:
+    - platform: template
+      value_template: >-
+        {{ states('sensor.beehive_1_weight') | float(50) <
+           states('input_number.beehive_min_weight') | float(15) }}
+      for:
+        minutes: 5
+  condition:
+    - condition: state
+      entity_id: input_boolean.beehive_alerts_enabled
+      state: "on"
+    - condition: template
+      value_template: >-
+        {% set last = states('input_datetime.beehive_last_alert') %}
+        {% set cooldown = states('input_number.beehive_alert_cooldown') | float(6) * 3600 %}
+        {% if last == 'unknown' or last == 'unavailable' %}
+          true
+        {% else %}
+          {{ (as_timestamp(now()) - as_timestamp(last)) > cooldown }}
+        {% endif %}
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "🐝 BEEHIVE WEIGHT ALERT"
+        message: >-
+          ⚠️ ATTENTION: Beehive weight is below minimum!
+
+          📍 Hive: Beehive 1
+          ⚖️ Current Weight: {{ states('sensor.beehive_1_weight') }} kg
+          ⚠️ Minimum Threshold: {{ states('input_number.beehive_min_weight') }} kg
+
+          📊 Current Status:
+          • Temperature: {{ states('sensor.beehive_1_temperature') }}°C
+          • Humidity: {{ states('sensor.beehive_1_humidity') }}%
+          • Battery: {{ states('sensor.beehive_1_battery') }}%
+
+          ⏰ Time: {{ now().strftime('%Y-%m-%d %H:%M') }}
+
+          🔧 Low weight may indicate:
+          • Food stores depleted - consider feeding
+          • Swarm has left
+          • Colony problems
+
+          --
+          ArduiBeeScale Monitoring System
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.beehive_last_alert
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Swarm Detection (Sudden Weight Drop)
+# -----------------------------------------------------------------------------
+
+automation_swarm_detection: |
+  alias: "🐝 Beehive Swarm Detection"
+  description: "Alert on sudden weight drop (possible swarm)"
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: sensor.beehive_1_weight
+  condition:
+    - condition: state
+      entity_id: input_boolean.beehive_alerts_enabled
+      state: "on"
+    - condition: template
+      value_template: >-
+        {% set old = trigger.from_state.state | float(0) %}
+        {% set new = trigger.to_state.state | float(0) %}
+        {{ (old - new) > 1.5 and old > 10 }}
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "🚨 POSSIBLE SWARM DETECTED!"
+        message: >-
+          🚨 URGENT: Sudden weight drop!
+
+          📍 Hive: Beehive 1
+          ⚖️ Before: {{ trigger.from_state.state }} kg
+          ⚖️ After: {{ trigger.to_state.state }} kg
+          📉 Lost: {{ (trigger.from_state.state | float - trigger.to_state.state | float) | round(2) }} kg
+
+          ⏰ Time: {{ now().strftime('%Y-%m-%d %H:%M') }}
+
+          This may indicate a swarm has left!
+          Please check your hive immediately.
+
+          --
+          ArduiBeeScale Monitoring System
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.beehive_last_alert
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Low Battery Alert
+# -----------------------------------------------------------------------------
+
+automation_low_battery: |
+  alias: "🐝 Beehive Low Battery"
+  description: "Alert when battery is below 20%"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.beehive_1_battery
+      below: 20
+      for:
+        hours: 1
+  condition:
+    - condition: state
+      entity_id: input_boolean.beehive_alerts_enabled
+      state: "on"
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "🔋 Beehive Battery Low"
+        message: >-
+          ⚠️ Beehive 1 battery is low!
+
+          🔋 Current: {{ states('sensor.beehive_1_battery') }}%
+
+          Please charge or replace the battery soon.
+
+          --
+          ArduiBeeScale Monitoring System
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Hive Offline Alert
+# -----------------------------------------------------------------------------
+
+automation_offline: |
+  alias: "🐝 Beehive Offline"
+  description: "Alert when hive stops reporting"
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: sensor.beehive_1_weight
+      to: "unavailable"
+      for:
+        hours: 6
+    - platform: state
+      entity_id: sensor.beehive_1_weight
+      to: "unknown"
+      for:
+        hours: 6
+  condition:
+    - condition: state
+      entity_id: input_boolean.beehive_alerts_enabled
+      state: "on"
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "📡 Beehive Offline"
+        message: >-
+          ⚠️ Beehive 1 stopped reporting!
+
+          Last seen: {{ states.sensor.beehive_1_weight.last_changed }}
+
+          Check: battery, WiFi, hardware.
+
+          --
+          ArduiBeeScale Monitoring System
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Daily Summary Email
+# -----------------------------------------------------------------------------
+
+automation_daily_summary: |
+  alias: "🐝 Beehive Daily Summary"
+  description: "Send daily report at 8 AM"
+  mode: single
+  trigger:
+    - platform: time
+      at: "08:00:00"
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "🐝 Daily Beehive Report"
+        message: >-
+          Good morning! Daily beehive status:
+
+          ═══════════════════════════════
+          📍 BEEHIVE 1
+          ═══════════════════════════════
+
+          ⚖️ Weight: {{ states('sensor.beehive_1_weight') }} kg
+          🌡️ Temperature: {{ states('sensor.beehive_1_temperature') }}°C
+          💧 Humidity: {{ states('sensor.beehive_1_humidity') }}%
+          🔋 Battery: {{ states('sensor.beehive_1_battery') }}%
+          📶 WiFi: {{ states('sensor.beehive_1_wifi_signal') }} dBm
+          🍯 Est. Honey: {{ states('sensor.beehive_1_honey_estimate') }} kg
+
+          ═══════════════════════════════
+          🌤️ CURRENT WEATHER
+          ═══════════════════════════════
+
+          Condition: {{ states('weather.home') }}
+          Wind: {{ state_attr('weather.home', 'wind_speed') | default('N/A') }} km/h
+
+          ═══════════════════════════════
+          ⚙️ ALERT SETTINGS
+          ═══════════════════════════════
+
+          Min Temp: {{ states('input_number.beehive_min_temperature') }}°C
+          Min Weight: {{ states('input_number.beehive_min_weight') }} kg
+          Beehive Alerts: {{ 'ON ✅' if is_state('input_boolean.beehive_alerts_enabled', 'on') else 'OFF ❌' }}
+          Storm Alerts: {{ 'ON ✅' if is_state('input_boolean.storm_alerts_enabled', 'on') else 'OFF ❌' }}
+
+          Have a great day! 🌻
+
+          --
+          ArduiBeeScale Monitoring System
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Storm Alert (Weather Warning)
+# -----------------------------------------------------------------------------
+# IMPORTANT: Replace weather.home with your actual weather entity ID
+
+automation_storm_alert: |
+  alias: "⛈️ Storm Alert - Beehive Warning"
+  description: "Alert when severe weather is detected that may affect beehives"
+  mode: single
+  trigger:
+    # Trigger on dangerous weather conditions
+    - platform: state
+      entity_id: weather.home
+      to:
+        - "lightning"
+        - "lightning-rainy"
+        - "hail"
+        - "exceptional"
+      id: condition_storm
+    # Trigger on high wind speed
+    - platform: template
+      value_template: >-
+        {{ state_attr('weather.home', 'wind_speed') | float(0) >
+           states('input_number.storm_wind_threshold') | float(50) }}
+      for:
+        minutes: 5
+      id: high_wind
+  condition:
+    - condition: state
+      entity_id: input_boolean.storm_alerts_enabled
+      state: "on"
+    # Cooldown: only alert once every 4 hours
+    - condition: template
+      value_template: >-
+        {% set last = states('input_datetime.beehive_last_storm_alert') %}
+        {% if last == 'unknown' or last == 'unavailable' %}
+          true
+        {% else %}
+          {{ (as_timestamp(now()) - as_timestamp(last)) > 14400 }}
+        {% endif %}
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "⛈️ STORM ALERT - Beehive Warning!"
+        message: >-
+          ⚠️ SEVERE WEATHER ALERT FOR YOUR BEEHIVES!
+
+          📍 Location: Your Apiary
+          🌤️ Current Condition: {{ states('weather.home') }}
+          💨 Wind Speed: {{ state_attr('weather.home', 'wind_speed') | default('N/A') }} km/h
+          🌡️ Temperature: {{ state_attr('weather.home', 'temperature') | default('N/A') }}°C
+
+          ⏰ Alert Time: {{ now().strftime('%Y-%m-%d %H:%M') }}
+
+          🐝 BEEHIVE STATUS:
+          • Hive Weight: {{ states('sensor.beehive_1_weight') }} kg
+          • Hive Temperature: {{ states('sensor.beehive_1_temperature') }}°C
+          • Battery: {{ states('sensor.beehive_1_battery') }}%
+
+          ⚠️ RECOMMENDED ACTIONS:
+          • Secure hive lids and straps
+          • Check for fallen debris after storm
+          • Avoid visiting during active storm
+          • Inspect hives when weather clears
+
+          Stay safe!
+
+          --
+          ArduiBeeScale Weather Alert System
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.beehive_last_storm_alert
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+
+# -----------------------------------------------------------------------------
+# AUTOMATION: Storm Forecast Alert (Pre-Warning)
+# -----------------------------------------------------------------------------
+
+automation_storm_forecast: |
+  alias: "⛈️ Storm Forecast Alert"
+  description: "Alert when severe weather is forecasted"
+  mode: single
+  trigger:
+    - platform: time_pattern
+      hours: "/3"
+  condition:
+    - condition: state
+      entity_id: input_boolean.storm_alerts_enabled
+      state: "on"
+    - condition: template
+      value_template: >-
+        {% set dominated = namespace(storm=false) %}
+        {% set dominated.conditions = ['lightning', 'lightning-rainy', 'hail', 'exceptional', 'pouring'] %}
+        {% for forecast in state_attr('weather.home', 'forecast')[:8] if forecast is defined %}
+          {% if forecast.condition in dominated.conditions %}
+            {% set dominated.storm = true %}
+          {% endif %}
+        {% endfor %}
+        {{ dominated.storm }}
+    # Only alert once per day for forecasts
+    - condition: template
+      value_template: >-
+        {% set last = states('input_datetime.beehive_last_storm_alert') %}
+        {% if last == 'unknown' or last == 'unavailable' %}
+          true
+        {% else %}
+          {{ (as_timestamp(now()) - as_timestamp(last)) > 86400 }}
+        {% endif %}
+  action:
+    - service: notify.email_beehive_alert
+      data:
+        title: "⛈️ Storm Forecast - Beehive Preparation"
+        message: >-
+          📢 SEVERE WEATHER FORECASTED
+
+          A storm is expected in the coming hours.
+
+          🌤️ Current: {{ states('weather.home') }}
+
+          🐝 Recommended preparations:
+          • Secure hive lids and straps
+          • Check entrance reducers
+          • Ensure drainage is clear
+
+          --
+          ArduiBeeScale Weather Alert System
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.beehive_last_storm_alert
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+
+# =============================================================================
+# PART 4: COMPLETE DASHBOARD VIEW
+# =============================================================================
+# To create a complete dashboard view, use this configuration
+
+complete_dashboard_view: |
+  title: Beehive Monitor
+  path: beehive
+  icon: mdi:beehive-outline
+  badges: []
+  cards:
+    # Row 1: Status + Gauges
+    - type: horizontal-stack
+      cards:
+        - type: entities
+          title: "🐝 Beehive 1"
+          entities:
+            - entity: sensor.beehive_1_weight
+              name: Weight
+            - entity: sensor.beehive_1_temperature
+              name: Temperature
+            - entity: sensor.beehive_1_humidity
+              name: Humidity
+            - entity: sensor.beehive_1_battery
+              name: Battery
+            - entity: sensor.beehive_1_honey_estimate
+              name: Est. Honey
+        - type: vertical-stack
+          cards:
+            - type: horizontal-stack
+              cards:
+                - type: gauge
+                  entity: sensor.beehive_1_weight
+                  name: Weight
+                  min: 0
+                  max: 80
+                  needle: true
+                - type: gauge
+                  entity: sensor.beehive_1_temperature
+                  name: Temp
+                  min: 0
+                  max: 50
+                  needle: true
+                  severity:
+                    red: 0
+                    yellow: 20
+                    green: 27
+
+    # Row 2: Temperature Chart
+    - type: history-graph
+      title: "🌡️ Temperature (7 Days)"
+      entities:
+        - entity: sensor.beehive_1_temperature
+      hours_to_show: 168
+
+    # Row 3: Humidity Chart
+    - type: history-graph
+      title: "💧 Humidity (7 Days)"
+      entities:
+        - entity: sensor.beehive_1_humidity
+      hours_to_show: 168
+
+    # Row 4: Weight Chart
+    - type: history-graph
+      title: "⚖️ Weight (30 Days)"
+      entities:
+        - entity: sensor.beehive_1_weight
+      hours_to_show: 720
+
+    # Row 5: Weather & Alert Settings
+    - type: horizontal-stack
+      cards:
+        - type: weather-forecast
+          entity: weather.home
+          show_forecast: true
+          name: "Local Weather"
+        - type: entities
+          title: "🔔 Alert Settings"
+          entities:
+            - entity: input_boolean.beehive_alerts_enabled
+              name: Beehive Alerts
+            - entity: input_boolean.storm_alerts_enabled
+              name: Storm Alerts
+            - entity: input_number.beehive_min_temperature
+              name: Min Temp
+            - entity: input_number.beehive_min_weight
+              name: Min Weight
+            - entity: input_number.storm_wind_threshold
+              name: Wind Threshold
