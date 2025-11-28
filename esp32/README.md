@@ -83,7 +83,9 @@ Follow these steps in order:
 
 ## Shopping List
 
-### Beehive Unit (~€36)
+### Beehive Unit Option A: ESP32-WROOM-32U (~€36)
+
+Best WiFi range (100m+) with external antenna.
 
 | Qty | Component | Purpose | Price |
 |-----|-----------|---------|-------|
@@ -98,15 +100,33 @@ Follow these steps in order:
 | 1 | Waterproof Enclosure | Outdoor protection | €6.00 |
 | - | Wires, connectors | Assembly | €5.00 |
 
+### Beehive Unit Option B: DollaTek/Heltec LoRa32 (~€32)
+
+Built-in OLED display, more compact, €4 cheaper. See [../esp32-lora32/](../esp32-lora32/)
+
+| Qty | Component | Purpose | Price |
+|-----|-----------|---------|-------|
+| 1 | DollaTek WiFi LoRa 32 868MHz | Board with built-in OLED 0.96" | €12.00 |
+| 1 | HX711 Module | Weight sensor amplifier | €1.00 |
+| 1 | 50kg Load Cell | Weight measurement | €8.00 |
+| 1 | DHT22 (AM2302) | Temperature & humidity sensor | €3.00 |
+| 1 | 18650 Battery | Power source (built-in charger) | €4.00 |
+| 1 | Waterproof Enclosure | Outdoor protection | €4.00 |
+
+> **LoRa32 Advantages**: Built-in OLED display, built-in battery charger, built-in battery ADC, more compact. No external components needed for display or battery monitoring.
+>
+> **LoRa32 Limitations**: Internal WiFi antenna (~50m range vs 100m). Use for hives closer to the AP.
+
 ### Optional Add-ons
 
 | Component | Purpose | Price |
 |-----------|---------|-------|
-| LCD 1602 I2C + Button | On-device display | €2.70 |
+| LCD 1602 I2C + Button | On-device display (ESP32-WROOM-32U only) | €2.70 |
 | Solar Panel 6V 1W | Infinite battery life | €5.00 |
 
-### Server Unit (~€84)
+### Server Unit (~€84-97)
 
+**Option A: Raspberry Pi 4** (Simpler setup)
 | Component | Purpose | Price |
 |-----------|---------|-------|
 | Raspberry Pi 4 (2GB+) | Home Assistant server | €45.00 |
@@ -115,14 +135,46 @@ Follow these steps in order:
 | Case with cooling | Protection | €10.00 |
 | Ethernet cable | Network connection | €3.00 |
 | USB WiFi Dongle + Antenna | Extended range to beehives | €8.00 |
+| **Subtotal** | | **~€84** |
+
+**Option B: Rock Pi 4/6** (More powerful, dedicated beehive WiFi)
+| Component | Purpose | Price |
+|-----------|---------|-------|
+| Rock Pi 4/6 (4GB+) | Home Assistant server | €60.00 |
+| MicroSD Card 32GB+ | Operating system | €8.00 |
+| Power Supply 5V 3A | Power | €10.00 |
+| Case | Protection | €8.00 |
+| Ethernet cable | Network connection | €3.00 |
+| USB WiFi Dongle + Antenna | **Dedicated beehive WiFi AP** | €8.00 |
+| **Subtotal** | | **~€97** |
+
+**Option B+ (Recommended): Rock Pi 4/6 with SSD** (Maximum reliability)
+| Component | Purpose | Price |
+|-----------|---------|-------|
+| Rock Pi 4/6 (4GB+) | Home Assistant server | €60.00 |
+| MicroSD Card 32GB+ | Operating system boot | €8.00 |
+| **NVMe/SATA SSD 128GB+** | **Data storage (prevents SD wear)** | €25.00 |
+| **SSD Extension Card** | **Connects SSD to Rock Pi** | €15.00 |
+| Power Supply 5V 3A | Power | €10.00 |
+| Case | Protection | €8.00 |
+| Ethernet cable | Network connection | €3.00 |
+| USB WiFi Dongle + Antenna | **Dedicated beehive WiFi AP** | €8.00 |
+| **Subtotal** | | **~€137** |
+
+> **Rock Pi Advantage**: Create a **separate WiFi network** just for beehives (e.g., "BeehiveNet"), isolated from your home network. Better security and reliability.
+>
+> **SSD Advantage**: Home Assistant writes frequently to disk (database, logs). MicroSD cards fail after 1-2 years of heavy use. SSD provides 10+ years reliability. See [ROCKPI_SETUP.md](ROCKPI_SETUP.md)
 
 ### Total Cost
 
 | Setup | Cost |
 |-------|------|
-| 1 hive + new Raspberry Pi | ~€120 |
-| 1 hive + existing Pi | ~€44 |
-| Each additional hive | ~€36 |
+| 1 hive (ESP32-WROOM) + Raspberry Pi | ~€120 |
+| 1 hive (LoRa32) + Raspberry Pi | ~€116 |
+| 1 hive (ESP32-WROOM) + Rock Pi + SSD | ~€173 |
+| 1 hive (LoRa32) + Rock Pi + SSD | ~€169 |
+| 1 hive + existing server | ~€36 (ESP32) / ~€32 (LoRa32) |
+| Each additional hive | ~€36 (ESP32) / ~€32 (LoRa32) |
 
 ---
 
@@ -467,7 +519,9 @@ Each additional hive needs its own ESP32 with a unique `HIVE_ID`:
 | Hive 2 | `#define HIVE_ID "hive02"` | `sensor.beehive_2_weight` |
 | Hive 3 | `#define HIVE_ID "hive03"` | `sensor.beehive_3_weight` |
 
-**Cost per additional hive**: ~€36
+**Cost per additional hive**: ~€36 (ESP32-WROOM) or ~€32 (LoRa32)
+
+> **Tip**: You can mix ESP32-WROOM-32U and LoRa32 boards. Use LoRa32 for hives close to the AP (built-in display), ESP32-WROOM-32U for distant hives (better WiFi range).
 
 See [HOME_ASSISTANT_SETUP.md](HOME_ASSISTANT_SETUP.md#7-multiple-beehives-setup) for:
 - Multi-hive dashboard cards
@@ -481,13 +535,15 @@ See [HOME_ASSISTANT_SETUP.md](HOME_ASSISTANT_SETUP.md#7-multiple-beehives-setup)
 
 | File | Description |
 |------|-------------|
-| `esp32_beescale.ino` | Main ESP32 firmware |
+| `esp32_beescale.ino` | Main ESP32-WROOM-32U firmware |
 | `config_template.h` | Configuration template (copy to `config.h`) |
 | `WIRING_DIAGRAM.md` | Detailed wiring diagrams |
 | `CALIBRATION.md` | Scale calibration guide |
 | `HOME_ASSISTANT_SETUP.md` | Complete HA setup with email alerts + multi-hive |
 | `home_assistant_examples.yaml` | Ready-to-use YAML configurations |
 | `platformio.ini` | PlatformIO configuration (alternative to Arduino IDE) |
+| `ROCKPI_SETUP.md` | Rock Pi setup with dedicated beehive WiFi network |
+| **[../esp32-lora32/](../esp32-lora32/)** | **DollaTek/Heltec LoRa32 variant with OLED** |
 
 ---
 
@@ -544,24 +600,23 @@ See [HOME_ASSISTANT_SETUP.md](HOME_ASSISTANT_SETUP.md#7-multiple-beehives-setup)
 
 ### ArduiBeeScale Variants
 
-This project offers two DIY variants. Choose based on your needs:
+This project offers three DIY variants. Choose based on your needs:
 
-| Criteria | Arduino + ESP-01 | ESP32 (This Version) |
-|----------|------------------|----------------------|
-| **Cost (1 hive + server)** | ~€95 | ~€120 |
-| **Cost (hive only)** | ~€56 | ~€36 |
-| **Complexity** | ⭐⭐⭐ Medium | ⭐⭐ Easy |
-| **Setup Time** | 6-8 hours | 2-4 hours |
-| **Battery Life** | 3-4 months (4xAA) | 6-12 months (18650) |
-| **WiFi Range** | ~50m (internal antenna) | ~100m (external 3dBi) |
-| **Server Software** | Custom Python + Flask | Home Assistant (standard) |
-| **Dashboard** | Custom web interface | Home Assistant UI |
-| **Email Alerts** | Manual setup | Built-in automations |
-| **Weather Alerts** | Not included | Included (free API) |
-| **Auto-Discovery** | No | Yes (MQTT) |
-| **Community Support** | Limited | Large HA community |
-| **LCD Display** | Optional | Optional |
-| **Deep Sleep** | Software sleep (~1mA) | Hardware sleep (~20µA) |
+| Criteria | Arduino + ESP-01 | ESP32-WROOM-32U | LoRa32 (OLED) |
+|----------|------------------|-----------------|---------------|
+| **Cost (1 hive + server)** | ~€95 | ~€120 | ~€116 |
+| **Cost (hive only)** | ~€56 | ~€36 | ~€32 |
+| **Complexity** | ⭐⭐⭐ Medium | ⭐⭐ Easy | ⭐ Easiest |
+| **Setup Time** | 6-8 hours | 2-4 hours | 1-2 hours |
+| **Battery Life** | 3-4 months | 6-12 months | 6-12 months |
+| **WiFi Range** | ~50m | ~100m (ext. antenna) | ~50m (internal) |
+| **Built-in Display** | No | No (optional LCD) | **Yes (OLED)** |
+| **Server Software** | Python + Flask | Home Assistant | Home Assistant |
+| **Email Alerts** | Manual | Built-in | Built-in |
+| **Weather Alerts** | No | Yes | Yes |
+| **Auto-Discovery** | No | Yes (MQTT) | Yes (MQTT) |
+| **Deep Sleep** | ~1mA | ~20µA | ~20µA |
+| **Future LoRa** | No | No | **Yes (2-10km)** |
 
 ### Detailed Comparison
 
@@ -628,6 +683,36 @@ Location: ./esp32/ (this folder)
 - Those wanting email/weather alerts
 - Beginners who want step-by-step guide
 - Long-term reliable monitoring
+- Hives far from WiFi AP (100m range)
+
+---
+
+#### DollaTek/Heltec WiFi LoRa 32 (LoRa32 Edition)
+
+```
+Location: ../esp32-lora32/
+```
+
+**Advantages:**
+- **Cheapest option** (~€32 per hive)
+- **Built-in OLED display** - no external screen needed
+- Built-in battery charger and ADC
+- Most compact form factor
+- Easiest wiring (fewer components)
+- Future LoRa expansion possible (2-10 km range)
+- Same Home Assistant integration as ESP32
+
+**Disadvantages:**
+- Internal WiFi antenna (~50m range)
+- Smaller display than LCD 1602
+- Less common board (may need to order online)
+
+**Best For:**
+- Budget-conscious builds
+- Hives within 50m of WiFi AP
+- Users who want built-in display
+- Compact installations
+- Future long-range LoRa expansion plans
 
 ---
 
@@ -635,6 +720,7 @@ Location: ./esp32/ (this folder)
 
 | Solution | Initial Cost | Monthly Cost | Battery | Data | Alerts |
 |----------|-------------|--------------|---------|------|--------|
+| **ArduiBeeScale LoRa32** | €116 | €0 | 6-12 mo | Local | Email + Weather |
 | **ArduiBeeScale ESP32** | €120 | €0 | 6-12 mo | Local | Email + Weather |
 | **ArduiBeeScale Arduino** | €95 | €0 | 3-4 mo | Local | Manual |
 | BroodMinder-W (weight) | €89 | €0 | 1 year | Cloud | App |
@@ -656,56 +742,62 @@ START
         YES            NO
          │              │
          ▼              ▼
-┌─────────────┐  ┌─────────────────────────┐
-│ ESP32       │  │ Want email/storm alerts?│
-│ (this one)  │  └─────────────────────────┘
-└─────────────┘           │           │
-                         YES         NO
-                          │           │
-                          ▼           ▼
-                   ┌──────────┐ ┌──────────────┐
-                   │ ESP32    │ │ Arduino+ESP01│
-                   │ + setup  │ │ (simpler)    │
-                   │ Home     │ │              │
-                   │ Assistant│ │              │
-                   └──────────┘ └──────────────┘
+┌─────────────────┐  ┌─────────────────────────┐
+│ Hive distance   │  │ Want email/storm alerts?│
+│ from WiFi AP?   │  └─────────────────────────┘
+└─────────────────┘           │           │
+    │         │              YES         NO
+  <50m      >50m              │           │
+    │         │               ▼           ▼
+    ▼         ▼        ┌──────────┐ ┌──────────────┐
+┌────────┐ ┌────────┐  │ ESP32 or │ │ Arduino+ESP01│
+│LoRa32  │ │ESP32   │  │ LoRa32   │ │ (simpler)    │
+│(OLED)  │ │(range) │  │ + setup  │ │              │
+│€32/hive│ │€36/hive│  │ Home     │ │              │
+└────────┘ └────────┘  │ Assistant│ │              │
+                       └──────────┘ └──────────────┘
 ```
 
 ### Cost Breakdown by Scenario
 
-| Scenario | Arduino+ESP01 | ESP32 | Savings |
-|----------|---------------|-------|---------|
-| 1 hive (new setup) | €95 | €120 | Arduino -€25 |
-| 1 hive (existing Pi) | €56 | €44 | ESP32 -€12 |
-| 2 hives (new setup) | €151 | €156 | Arduino -€5 |
-| 3 hives (new setup) | €207 | €192 | ESP32 -€15 |
-| 5 hives (new setup) | €319 | €264 | ESP32 -€55 |
-| 10 hives (new setup) | €599 | €444 | ESP32 -€155 |
+| Scenario | Arduino | ESP32 | LoRa32 | Best Value |
+|----------|---------|-------|--------|------------|
+| 1 hive + new Raspberry Pi | €95 | €120 | €116 | Arduino |
+| 1 hive + new Rock Pi + SSD | €135 | €173 | €169 | Arduino |
+| 1 hive + existing server | €56 | €36 | €32 | **LoRa32** |
+| 2 hives + new server | €151 | €156 | €148 | **LoRa32** |
+| 3 hives + new server | €207 | €192 | €180 | **LoRa32** |
+| 5 hives + new server | €319 | €264 | €244 | **LoRa32** |
+| 10 hives + new server | €599 | €444 | €404 | **LoRa32** |
 
 **Conclusion**:
-- **Single hive, budget priority** → Arduino + ESP-01
-- **Multiple hives or want alerts** → ESP32 + Home Assistant
-- **Already have Home Assistant** → ESP32 (no contest)
+- **Cheapest per hive** → LoRa32 (~€32/hive)
+- **Best WiFi range** → ESP32-WROOM-32U (100m)
+- **Built-in display** → LoRa32 (OLED included)
+- **Maximum reliability** → Any ESP32 + Rock Pi + SSD
+- **Already have Home Assistant** → LoRa32 or ESP32
 
 ### Feature Matrix
 
-| Feature | Arduino | ESP32 | BroodMinder | Arnia |
-|---------|---------|-------|-------------|-------|
-| Weight | ✅ | ✅ | ✅ | ✅ |
-| Temperature | ✅ | ✅ | ✅ | ✅ |
-| Humidity | ✅ | ✅ | ❌ | ✅ |
-| Battery Monitor | ❌ | ✅ | ✅ | ✅ |
-| WiFi Signal | ❌ | ✅ | ❌ | ✅ |
-| Email Alerts | ⚠️ Manual | ✅ | ✅ App | ✅ |
-| Weather Alerts | ❌ | ✅ | ❌ | ❌ |
-| Swarm Detection | ⚠️ Manual | ✅ | ✅ | ✅ |
-| LCD Display | ✅ Optional | ✅ Optional | ❌ | ❌ |
-| Charts/History | ✅ | ✅ | ✅ | ✅ |
-| Multi-Hive | ⚠️ Complex | ✅ Easy | ✅ | ✅ |
-| Data Privacy | ✅ 100% Local | ✅ 100% Local | ❌ Cloud | ❌ Cloud |
-| No Subscription | ✅ | ✅ | ✅ | ❌ |
-| Open Source | ✅ | ✅ | ❌ | ❌ |
-| DIY Repairable | ✅ | ✅ | ❌ | ❌ |
+| Feature | Arduino | ESP32 | LoRa32 | BroodMinder | Arnia |
+|---------|---------|-------|--------|-------------|-------|
+| Weight | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Temperature | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Humidity | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Battery Monitor | ❌ | ✅ | ✅ Built-in | ✅ | ✅ |
+| WiFi Signal | ❌ | ✅ | ✅ | ❌ | ✅ |
+| Email Alerts | ⚠️ Manual | ✅ | ✅ | ✅ App | ✅ |
+| Weather Alerts | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Swarm Detection | ⚠️ Manual | ✅ | ✅ | ✅ | ✅ |
+| Display | ✅ Optional | ✅ Optional | ✅ **Built-in** | ❌ | ❌ |
+| WiFi Range | ~50m | ~100m | ~50m | N/A | N/A |
+| Charts/History | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Multi-Hive | ⚠️ Complex | ✅ Easy | ✅ Easy | ✅ | ✅ |
+| Data Privacy | ✅ Local | ✅ Local | ✅ Local | ❌ Cloud | ❌ Cloud |
+| No Subscription | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Open Source | ✅ | ✅ | ✅ | ❌ | ❌ |
+| DIY Repairable | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Future LoRa | ❌ | ❌ | ✅ 2-10km | ❌ | ❌ |
 
 ---
 
